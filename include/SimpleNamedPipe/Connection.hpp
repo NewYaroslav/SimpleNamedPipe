@@ -226,12 +226,13 @@ namespace SimpleNamedPipe {
 
         /// \brief Closes the pipe and invokes the close callback.
         void close_pipe() {
+            if (m_connection_closed) return;
             if (m_pipe != INVALID_HANDLE_VALUE) {
+                DisconnectNamedPipe(m_pipe);
                 CancelIoEx(m_pipe, &m_overlapped);
                 CancelIoEx(m_pipe, &m_write_overlapped);
-                DisconnectNamedPipe(m_pipe);
-                CloseHandle(m_pipe);
-                m_pipe = INVALID_HANDLE_VALUE;
+                //CloseHandle(m_pipe);
+               // m_pipe = INVALID_HANDLE_VALUE;
             }
             m_connection_closed = true;
         }

@@ -364,8 +364,12 @@ namespace SimpleNamedPipe {
 
                     lock_connections.lock();
                     for (auto it = m_connections.begin(); it != m_connections.end();) {
+                        auto &pipe = it->first;
                         auto &connection = it->second;
                         if (!connection || connection->is_closed()) {
+                            //CancelIoEx(pipe, nullptr);
+                            CloseHandle(pipe);
+                            //pipe = INVALID_HANDLE_VALUE;
                             it = m_connections.erase(it);
                         } else {
                             ++it;
@@ -381,8 +385,80 @@ namespace SimpleNamedPipe {
                     auto &connection = it->second;
                     connection->close();
                     connection->process_send_queue();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
                 lock_connections.unlock();
+
+                for (;;) {
+                    DWORD bytes_transferred;
+                    ULONG_PTR key;
+                    LPOVERLAPPED overlapped = nullptr;
+
+                    BOOL success = GetQueuedCompletionStatus(m_completion_port, &bytes_transferred, &key, &overlapped, 0);
+                    if (!success) {
+                        DWORD error = GetLastError();
+                        if (error == WAIT_TIMEOUT) {
+                            break; // Нет завершённых операций, выходим из цикла.
+                        } else {
+                            // https://stackoverflow.com/questions/64863170/whats-the-return-of-getqueuedcompletionstatus-when-the-i-o-is-cancelled-via-can
+                            // Если GetQueuedCompletionStatus()возвращает FALSE И ВЫВОДИТ НЕНУЛЕВОЙ OVERLAPPED*указатель , это означает, что пакет ввода-вывода со статусом ошибки был исключен из очереди
+                            // Если GetQueuedCompletionStatus()возвращает FALSE И ВЫВОДИТ NULL- OVERLAPPED*указатель , это означает GetQueuedCompletionStatus(), что произошел сбой, поэтому все выходные значения неопределенны и должны игнорироваться
+
+                            // Обработка критической ошибки.
+                            if (on_server_error) on_server_error(std::error_code(error, std::system_category()));
+                            continue;
+                        }
+                    }
+
+                    HANDLE pipe = reinterpret_cast<HANDLE>(key);
+                    std::lock_guard<std::mutex> lock(m_connections_mutex);
+                    auto it = m_connections.find(pipe);
+                    if (it != m_connections.end()) {
+                        if (it->second) it->second->complete_read();
+                    }
+                }
+
+                lock_connections.lock();
+                for (auto it = m_connections.begin(); it != m_connections.end(); it++) {
+                    auto &pipe = it->first;
+                    //CancelIoEx(pipe, nullptr);
+                    CloseHandle(pipe);
+                    //pipe = INVALID_HANDLE_VALUE;
+                }
+                lock_connections.unlock();
+
+                PostQueuedCompletionStatus(m_completion_port, 0, 0, nullptr);
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+                for (;;) {
+                    DWORD bytes_transferred;
+                    ULONG_PTR key;
+                    LPOVERLAPPED overlapped = nullptr;
+
+                    BOOL success = GetQueuedCompletionStatus(m_completion_port, &bytes_transferred, &key, &overlapped, 0);
+                    if (!success) {
+                        DWORD error = GetLastError();
+                        if (error == WAIT_TIMEOUT) {
+                            break; // Нет завершённых операций, выходим из цикла.
+                        } else {
+                            // https://stackoverflow.com/questions/64863170/whats-the-return-of-getqueuedcompletionstatus-when-the-i-o-is-cancelled-via-can
+                            // Если GetQueuedCompletionStatus()возвращает FALSE И ВЫВОДИТ НЕНУЛЕВОЙ OVERLAPPED*указатель , это означает, что пакет ввода-вывода со статусом ошибки был исключен из очереди
+                            // Если GetQueuedCompletionStatus()возвращает FALSE И ВЫВОДИТ NULL- OVERLAPPED*указатель , это означает GetQueuedCompletionStatus(), что произошел сбой, поэтому все выходные значения неопределенны и должны игнорироваться
+
+                            // Обработка критической ошибки.
+                            if (on_server_error) on_server_error(std::error_code(error, std::system_category()));
+                            continue;
+                        }
+                    }
+
+                    HANDLE pipe = reinterpret_cast<HANDLE>(key);
+                    std::lock_guard<std::mutex> lock(m_connections_mutex);
+                    auto it = m_connections.find(pipe);
+                    if (it != m_connections.end()) {
+                        if (it->second) it->second->complete_read();
+                    }
+                }
 
                 if (m_completion_port) {
                     CloseHandle(m_completion_port);
