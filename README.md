@@ -3,3 +3,7 @@ SimpleNamedPipe is a lightweight C++ library for creating and managing asynchron
 
 
 ## Полезные ссылки
+
+- [Нamed Pipe Server using Overlapped I/O](https://learn.microsoft.com/ru-ru/windows/win32/ipc/named-pipe-server-using-overlapped-i-o)
+- [Winsock2 Advanced Named Pipe](https://www.winsocketdotnetworkprogramming.com/winsock2programming/winsock2advancednamedpipe15a.html)
+- [Основы разработки программ для операционных систем семейств Windows и Linux](https://repo.ssau.ru/bitstream/Uchebnye-izdaniya/Operacionnye-sistemy-Osnovy-razrabotki-programm-dlya-operacionnyh-sistem-semeistv-Windows-i-Linux-109472/1/978-5-7883-2035-9_%202024.pdf)
