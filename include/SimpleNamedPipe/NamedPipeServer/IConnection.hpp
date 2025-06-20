@@ -2,6 +2,9 @@
 #ifndef _SIMPLE_NAMED_PIPE_SERVER_ICONNECTION_HPP_INCLUDED
 #define _SIMPLE_NAMED_PIPE_SERVER_ICONNECTION_HPP_INCLUDED
 
+/// \file IConnection.hpp
+/// \brief Interface for server-side connection operations.
+
 #include <functional>
 
 namespace SimpleNamedPipe {
