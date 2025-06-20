@@ -3,13 +3,47 @@
 //|                                      Copyright 2025, NewYaroslav |
 //|                   https://github.com/NewYaroslav/SimpleNamedPipe |
 //+------------------------------------------------------------------+
+
+/// \file NamedPipeClient.mqh
+/// \brief Implementation of NamedPipeClient class for working with Windows Named Pipes.
+
+#ifndef _SIMPLE_NAMED_PIPE_CLIENT_MQH
+#define _SIMPLE_NAMED_PIPE_CLIENT_MQH
+
 #property copyright "Copyright 2025, NewYaroslav"
 #property link      "https://github.com/NewYaroslav/SimpleNamedPipe"
 
 #include <WinAPI\winapi.mqh>
 
-#define PIPE_READMODE_MESSAGE       2
+/// \def SNP_ENABLE_GLOBAL_CALLBACKS
+/// \brief Enables global callback usage for NamedPipeClient events.
+///
+/// If defined, the following macros will call user-defined global functions:
+/// - `SNP_CALL_ON_OPEN(client)` → `OnPipeOpen(client)`
+/// - `SNP_CALL_ON_CLOSE(client)` → `OnPipeClose(client)`
+/// - `SNP_CALL_ON_ERROR(client, msg)` → `OnPipeError(client, msg)`
+/// - `SNP_CALL_ON_MESSAGE(client, msg)` → `OnPipeMessage(client, msg)`
+///
+/// If not defined, all `SNP_CALL_ON_*` macros expand to no-ops.
+// #define SNP_ENABLE_GLOBAL_CALLBACKS
+#ifdef SNP_ENABLE_GLOBAL_CALLBACKS
 
+#define SNP_CALL_ON_OPEN(client)         OnPipeOpen(client)
+#define SNP_CALL_ON_CLOSE(client)        OnPipeClose(client)
+#define SNP_CALL_ON_ERROR(client, msg)   OnPipeError(client, msg)
+#define SNP_CALL_ON_MESSAGE(client, msg) OnPipeMessage(client, msg)
+
+#else
+
+#define SNP_CALL_ON_OPEN(client)
+#define SNP_CALL_ON_CLOSE(client)
+#define SNP_CALL_ON_ERROR(client, msg)
+#define SNP_CALL_ON_MESSAGE(client, msg)
+
+#endif
+
+#define PIPE_READMODE_MESSAGE       2
+#define PIPE_WAIT_TIMEOUT_MS        5000
 #define INVALID_HANDLE_VALUE        -1
 #define GENERIC_READ                0x80000000
 #define GENERIC_WRITE               0x40000000
@@ -29,219 +63,230 @@ int   WriteFile(HANDLE file,uchar &buffer[],uint number_of_bytes_to_write,uint &
 int   ReadFile(HANDLE file,char &buffer[],uint number_of_bytes_to_read,uint &number_of_bytes_read,PVOID overlapped);
 bool  PeekNamedPipe(HANDLE fileHandle, int buffer, int bytes, int bytesRead, int &numOfBytes, int bytesLeftThisMessage);
 #import
+
+//+------------------------------------------------------------------+
+//| Interface for event handler                                      |
 //+------------------------------------------------------------------+
 
-/// \brief Класс клиента именованного канала
+/// \brief Interface for handling NamedPipeClient events
+class INamedPipeHandler {
+public:
+   virtual void on_open() {}
+   virtual void on_close() {}
+   virtual void on_message(const string &message) {}
+   virtual void on_error(const string &error_message) {}
+};
+
+//+------------------------------------------------------------------+
+//| NamedPipeClient class                                            |
+//+------------------------------------------------------------------+
+
+/// \brief Client for connecting to named pipes and exchanging messages
 class NamedPipeClient {
-private:
-	HANDLE  pipe_handle;      // хэндл канала
-	string  pipe_name_error_title;
-	string  pipe_name;
-	string  pipe_name_prefix;
-	uint    buffer_size;
-	int     pipe_id;
-    bool    is_connected;
-    bool    is_error;
 public:
 
-        NamedPipeClient() {
-                pipe_name_prefix  = "\\\\.\\pipe\\";
-                pipe_name_error_title = "NamedPipeClient error! What: ";
-                buffer_size       = PIPE_BUFFER_SIZE;
-                pipe_handle       = INVALID_HANDLE_VALUE;
-                is_connected      = false;
-                is_error          = false;
-                pipe_id = 0;
-                kernel32::GetLastError();
-                on_open    = NULL;
-                on_close   = NULL;
-                on_message = NULL;
-                on_error   = NULL;
-        }
-	
-	/// \brief Class constructor
-	/// \param name      Named channel name
-	/// \param user_id   Unique channel number
-        NamedPipeClient(const string &name, const int user_id = 0) {
-            pipe_name_prefix  = "\\\\.\\pipe\\";
-                pipe_name_error_title = "NamedPipeClient error! What: ";
-                buffer_size       = PIPE_BUFFER_SIZE;
-                pipe_handle       = INVALID_HANDLE_VALUE;
-                is_connected      = false;
-                is_error          = false;
-                pipe_id = 0;
-                kernel32::GetLastError();
-                on_open    = NULL;
-                on_close   = NULL;
-                on_message = NULL;
-                on_error   = NULL;
-                open(name, user_id);
-        }
-	
-	/// \brief Class destructor
-	~NamedPipeClient() {
-		close();
-	}
-	
-        // Callback pointers
-        void (*on_open)   (NamedPipeClient *pointer);
-        void (*on_close)  (NamedPipeClient *pointer);
-        void (*on_message)(NamedPipeClient *pointer, const string &message);
-        void (*on_error)  (NamedPipeClient *pointer, const string &error_message);
-	
-	/// \brief Проверка наличия соединения
-	/// \return Вернет true, если соединение установлено
-	bool connected() {
-	    return is_connected;
-	}
-	
-	/// \brief Установить размер буфера
-	/// \param size Размер буфера
-	void set_buffer_size(int size) {
-	   buffer_size = size;
-	}
+    /// \brief Default constructor
+    NamedPipeClient() {
+        init_members();
+    }
+    
+    /// \brief Constructor with pipe name
+    /// \param name Pipe name to connect to
+    NamedPipeClient(const string &name) {
+        pipe_name_prefix  = "\\\\.\\pipe\\";
+        init_members();
+        open(name);
+    }
+    
+    /// \brief Destructor, automatically closes pipe
+    ~NamedPipeClient() {
+        close();
+    }
+    
+    /// \brief Set external event handler
+    /// \param h Pointer to event handler object
+    void set_handler(INamedPipeHandler *h) {
+        handler = h;
+    }
 
-	/// \brief Открывает ранее созданный канал
-	/// \param name      Имя именованного канала
-	/// \param user_id   Уникальный номер канала
-	/// \return Вернет true, если успешно, иначе false
-	bool open(const string &name, const int user_id = 0) {
-		if(pipe_handle == INVALID_HANDLE_VALUE) {
-			pipe_name = name;
-		    pipe_id = user_id;
-		    const string full_pipe_name = pipe_name_prefix + pipe_name;
- 
-                        if(WaitNamedPipeW(full_pipe_name, 5000) == 0) {
-                                const string err_msg = pipe_name_error_title + "Pipe " + full_pipe_name + " busy.";
-                                if (!is_error && on_error != NULL) on_error(GetPointer(this), err_msg);
-                                is_error = true;
-                                return false;
-                        }
+    /// \brief Check if client is connected
+    /// \return True if connected
+    bool connected() {
+        return is_connected;
+    }
+    
+    /// \brief Set internal buffer size
+    /// \param size Buffer size in bytes
+    void set_buffer_size(int size) {
+       buffer_size = size;
+    }
 
-			pipe_handle = CreateFileW(
-				full_pipe_name, 
-				(int)(GENERIC_READ | GENERIC_WRITE), 
-				0, 
-				NULL, 
-				OPEN_EXISTING, 
-				0, 
-				NULL);
-                        if(pipe_handle == INVALID_HANDLE_VALUE) {
-                                const string err_msg= pipe_name_error_title + "Pipe open failed, error: " + IntegerToString(kernel32::GetLastError());
-                                if (!is_error && on_error != NULL) on_error(GetPointer(this), err_msg);
-                                is_error = true;
-                                return false;
-                        }
-			
-			/* устанавливаем режим чтения
-            * Клиентская сторона именованного канала начинается в байтовом режиме,
-            * даже если серверная часть находится в режиме сообщений.
-            * Чтобы избежать проблем с получением данных,
-            * установите на стороне клиента также режим сообщений.
-            * Чтобы изменить режим канала, клиент канала должен
-            * открыть канал только для чтения с доступом
-            * GENERIC_READ и FILE_WRITE_ATTRIBUTES
-            */
-            uint mode = PIPE_READMODE_MESSAGE;
-            bool success = SetNamedPipeHandleState(
-                pipe_handle,
-                mode,
-                NULL,     // не устанавливать максимальные байты
-                NULL);    // не устанавливайте максимальное время
-         
-            if(!success) {
-                const string err_msg = pipe_name_error_title + "SetNamedPipeHandleState failed, error: " + IntegerToString(kernel32::GetLastError());
-                if (!is_error && on_error != NULL) on_error(GetPointer(this), err_msg);
-                is_error = true;
-                CloseHandle(pipe_handle);
-                pipe_handle = INVALID_HANDLE_VALUE;
-                return false;
+    /// \brief Open named pipe
+    /// \param name Name of the pipe
+    /// \return True if successful, false otherwise
+    bool open(const string &name) {
+        if (pipe_handle != INVALID_HANDLE_VALUE) {
+            close();
+        }
+
+        pipe_name = name;
+        const string full_pipe_name = pipe_name_prefix + pipe_name;
+
+        if (WaitNamedPipeW(full_pipe_name, PIPE_WAIT_TIMEOUT_MS) == 0) {
+            const string err_msg = pipe_name_error_title + "Pipe " + full_pipe_name + " busy.";
+            if (!is_error) { 
+                if (handler != NULL) handler.on_error(err_msg);
+                SNP_CALL_ON_ERROR(GetPointer(this), err_msg);
             }
-            if(on_open != NULL) on_open(GetPointer(this));
-		}
-		is_connected = true;
-		is_error = false;
-		return true;
-	}
+            is_error = true;
+            return false;
+        }
 
-	/// \brief Закрывает дескриптор канала
-	/// \return 0, если успешно, иначе ненулевое значение
-	int close() {
-		if (pipe_handle != INVALID_HANDLE_VALUE) {
-                int err = CloseHandle(pipe_handle);
-                pipe_handle = INVALID_HANDLE_VALUE;
-                if (is_connected && on_close != NULL) on_close(GetPointer(this));
-                is_connected = false;
-    		return err;
-		}
-		return 0;
-	}
+        pipe_handle = CreateFileW(
+            full_pipe_name, 
+            (int)(GENERIC_READ | GENERIC_WRITE), 
+            0, 
+            NULL, 
+            OPEN_EXISTING, 
+            0, 
+            NULL);
 
-	/// \brief Сбрасывает буфер канала
-	void flush() {
+        if (pipe_handle == INVALID_HANDLE_VALUE) {
+            const string err_msg= pipe_name_error_title + "Pipe open failed, error: " + IntegerToString(kernel32::GetLastError());
+            if (!is_error) { 
+                if (handler != NULL) handler.on_error(err_msg);
+                SNP_CALL_ON_ERROR(GetPointer(this), err_msg);
+            }
+            is_error = true;
+            return false;
+        }
+        
+        // Set read mode.
+        // The client side of a named pipe starts in byte mode,
+        // even if the server is configured in message mode.
+        // To avoid issues with reading data,
+        // set the client side to message mode as well.
+        // To change the pipe mode, the client must open the pipe
+        // with GENERIC_READ and FILE_WRITE_ATTRIBUTES access.
+        uint mode = PIPE_READMODE_MESSAGE;
+        bool success = SetNamedPipeHandleState(
+            pipe_handle,
+            mode,
+            NULL,     // do not set max bytes
+            NULL);    // do not set max time
+     
+        if(!success) {
+            const string err_msg = pipe_name_error_title + "SetNamedPipeHandleState failed, error: " + IntegerToString(kernel32::GetLastError());
+            if (!is_error) { 
+                if (handler != NULL) handler.on_error(err_msg);
+                SNP_CALL_ON_ERROR(GetPointer(this), err_msg);
+            }
+            is_error = true;
+            CloseHandle(pipe_handle);
+            pipe_handle = INVALID_HANDLE_VALUE;
+            return false;
+        }
+
+        if (handler != NULL) handler.on_open();
+        SNP_CALL_ON_OPEN(GetPointer(this));
+
+        is_connected = true;
+        is_error = false;
+        return true;
+    }
+
+    /// \brief Close pipe handle and notify if previously connected
+    /// \return 0 if successful, non-zero otherwise
+    int close() {
+        if (pipe_handle == INVALID_HANDLE_VALUE) return 0;
+
+        int err = CloseHandle(pipe_handle);
+        pipe_handle = INVALID_HANDLE_VALUE;
+        
+        if (is_connected) {
+            if (handler != NULL) handler.on_close();
+            SNP_CALL_ON_CLOSE(GetPointer(this));
+        }
+        is_connected = false;
+        return err;
+    }
+
+    /// \brief Flush pipe output buffer
+    void flush() {
         if (pipe_handle == INVALID_HANDLE_VALUE) return;
         FlushFileBuffers(pipe_handle);
-	}
-	
-	/// \brief Write a string to a pipe
-	/// \param message String containing the message
-	/// \return Returns true if the write was successful
-	bool write(string message) {
-		if (pipe_handle == INVALID_HANDLE_VALUE) return false;
+    }
+    
+    /// \brief Write UTF-8 encoded message to pipe
+    /// \param message String to send
+    /// \return True if write was successful
+    bool write(const string &message) {
+        if (pipe_handle == INVALID_HANDLE_VALUE) return false;
         if (StringLen(message) == 0) return false;
+        
         uchar utf8_array[];
         uint bytes_written = 0;
         uint bytes_to_write = StringToCharArray(message, utf8_array, 0, -1, CP_UTF8);
         bytes_to_write = ArraySize(utf8_array);
         bytes_to_write--; // При копировании функция StringToCharArray() также копирует символ '\0', завершающий строку.
-        WriteFile(
-			pipe_handle,
-			utf8_array,
-			bytes_to_write,
-			bytes_written,
-			NULL);
-		Print("bytes_to_write: ", bytes_to_write);
-        if(bytes_written != bytes_to_write) {
+
+        bool result = WriteFile(pipe_handle, utf8_array, bytes_to_write, bytes_written, NULL);
+        
+        if (!result || bytes_written != bytes_to_write) {
+            const string err_msg = pipe_name_error_title + "WriteFile failed, error: " + IntegerToString(kernel32::GetLastError());
+            if (handler != NULL) handler.on_error(err_msg);
+            SNP_CALL_ON_ERROR(GetPointer(this), err_msg);
             close();
             return false;
         }
+
         return true;
-	}
-   
-	/// \brief Читает строку формата ANSI из канала
-	/// \return Строка в формате Unicode (string в MQL5)
-	string read() {
+    }
+
+    /// \brief Read message from pipe
+    /// \return UTF-8 decoded string or empty if failed
+    string read() {
         if (pipe_handle == INVALID_HANDLE_VALUE) return "";
-        string ret;
         char char_array[];
         ArrayResize(char_array, buffer_size);
+        
         uint bytes_read = 0;
-        ReadFile(
+        bool result = ReadFile(
             pipe_handle,
             char_array,
             buffer_size,
             bytes_read,
-            0);
-        if(bytes_read != 0) ret = CharArrayToString(char_array, 0, bytes_read, CP_UTF8);
-        return ret;
-	}
-	
-        void on_timer() {
+            NULL);
+            
+        if (!result || bytes_read == 0) {
+            const string err_msg = pipe_name_error_title + "ReadFile failed, error: " + IntegerToString(kernel32::GetLastError());
+            if (handler != NULL) handler.on_error(err_msg);
+            SNP_CALL_ON_ERROR(GetPointer(this), err_msg);
+            close();
+            return "";
+        }
+
+        return CharArrayToString(char_array, 0, bytes_read, CP_UTF8);
+    }
+    
+    /// \brief Update connection and process any incoming messages
+    void update() {
         if (is_connected) {
             if (get_bytes_read() > 0) {
                 const string message = read();
-                if(on_message != NULL) on_message(GetPointer(this), message);
+                if (handler != NULL) handler.on_message(message);
+                SNP_CALL_ON_MESSAGE(GetPointer(this), message);
             }
         } else {
-            open(pipe_name, pipe_id);
+            open(pipe_name);
         }
-        }
-	
-	/// \brief Получить количество байтов для чтения
-	/// \return Количество байтов для чтения
-	int get_bytes_read() {
-	    if (pipe_handle == INVALID_HANDLE_VALUE) return 0;
-	    int bytes_to_read = 0;
+    }
+    
+    /// \brief Check how many bytes are available to read
+    /// \return Number of bytes available
+    int get_bytes_read() {
+        if (pipe_handle == INVALID_HANDLE_VALUE) return 0;
+        int bytes_to_read = 0;
         PeekNamedPipe(
             pipe_handle,
             NULL,
@@ -250,23 +295,44 @@ public:
             bytes_to_read,
             NULL);
         return bytes_to_read;
-	};
+    }
 
-	/// \brief Возвращает имя канала
-	/// \return Строка с именем канала
-	string get_pipe_name() {
-		return pipe_name;
-	};
-	
-	/// \brief Возвращает handle канала
-	/// \return HANDLE канала
+    /// \brief Get pipe name
+    /// \return Pipe name as string
+    string get_pipe_name() {
+        return pipe_name;
+    }
+    
+    /// \brief Get pipe handle
+    /// \return Pipe HANDLE
     HANDLE get_pipe_handle() {
         return pipe_handle;
-    };
+    }
+
+    /// \brief Check if last operation caused an error
+    /// \return True if error occurred
+    bool has_error() const { return is_error; }
     
-	/// \brief Возвращает user_id канала
-	/// \return user_id канала
-    int get_pipe_id() {
-        return pipe_id;
-    };
+private:
+    INamedPipeHandler *handler;
+    HANDLE  pipe_handle;
+    string  pipe_name_error_title;
+    string  pipe_name;
+    string  pipe_name_prefix;
+    uint    buffer_size;
+    bool    is_connected;
+    bool    is_error;
+
+    void init_members() {
+        pipe_name_prefix  = "\\\\.\\pipe\\";
+        pipe_name_error_title = "NamedPipeClient error! What: ";
+        buffer_size  = PIPE_BUFFER_SIZE;
+        pipe_handle  = INVALID_HANDLE_VALUE;
+        is_connected = false;
+        is_error     = false;
+        handler    = NULL;
+        kernel32::GetLastError();
+    }
 };
+
+#endif // _SIMPLE_NAMED_PIPE_CLIENT_MQH
