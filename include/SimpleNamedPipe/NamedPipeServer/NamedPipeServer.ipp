@@ -402,7 +402,7 @@ namespace SimpleNamedPipe {
         size_t bytes_to_copy = std::min(buffer_size, cmd.message.size() - msg_offset);
         auto& buffer = m_write_buffers[index];
         buffer.assign(cmd.message.begin() + msg_offset, cmd.message.begin() + msg_offset + bytes_to_copy);
-        cmd.offset = bytes_to_copy;
+        cmd.offset += bytes_to_copy;
 
         OVERLAPPED* ov = &m_write_overlapped[index];
         memset(ov, 0, sizeof(OVERLAPPED));
