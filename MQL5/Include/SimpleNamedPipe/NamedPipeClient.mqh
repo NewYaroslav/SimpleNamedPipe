@@ -44,42 +44,50 @@ private:
     bool    is_error;
 public:
 
-	NamedPipeClient() {
-		pipe_name_prefix  = "\\\\.\\pipe\\";
-		pipe_name_error_title = "NamedPipeClient error! What: ";
-		buffer_size       = PIPE_BUFFER_SIZE;
-		pipe_handle       = INVALID_HANDLE_VALUE;
-		is_connected      = false;
-		is_error          = false;
-		pipe_id = 0;
-		kernel32::GetLastError();
-	}
+        NamedPipeClient() {
+                pipe_name_prefix  = "\\\\.\\pipe\\";
+                pipe_name_error_title = "NamedPipeClient error! What: ";
+                buffer_size       = PIPE_BUFFER_SIZE;
+                pipe_handle       = INVALID_HANDLE_VALUE;
+                is_connected      = false;
+                is_error          = false;
+                pipe_id = 0;
+                kernel32::GetLastError();
+                on_open    = NULL;
+                on_close   = NULL;
+                on_message = NULL;
+                on_error   = NULL;
+        }
 	
 	/// \brief Class constructor
 	/// \param name      Named channel name
 	/// \param user_id   Unique channel number
-	NamedPipeClient(const string &name, const int user_id = 0) {
-	    pipe_name_prefix  = "\\\\.\\pipe\\";
-		pipe_name_error_title = "NamedPipeClient error! What: ";
-		buffer_size       = PIPE_BUFFER_SIZE;
-		pipe_handle       = INVALID_HANDLE_VALUE;
-		is_connected      = false;
-		is_error          = false;
-		pipe_id = 0;
-		kernel32::GetLastError();
-		open(name, user_id);
-	}
+        NamedPipeClient(const string &name, const int user_id = 0) {
+            pipe_name_prefix  = "\\\\.\\pipe\\";
+                pipe_name_error_title = "NamedPipeClient error! What: ";
+                buffer_size       = PIPE_BUFFER_SIZE;
+                pipe_handle       = INVALID_HANDLE_VALUE;
+                is_connected      = false;
+                is_error          = false;
+                pipe_id = 0;
+                kernel32::GetLastError();
+                on_open    = NULL;
+                on_close   = NULL;
+                on_message = NULL;
+                on_error   = NULL;
+                open(name, user_id);
+        }
 	
 	/// \brief Class destructor
 	~NamedPipeClient() {
 		close();
 	}
 	
-	// Callback functions
-	void on_open   (NamedPipeClient *pointer);
-	void on_close  (NamedPipeClient *pointer);
-	void on_message(NamedPipeClient *pointer, const string &message);
-	void on_error  (NamedPipeClient *pointer, const string &error_message);
+        // Callback pointers
+        void (*on_open)   (NamedPipeClient *pointer);
+        void (*on_close)  (NamedPipeClient *pointer);
+        void (*on_message)(NamedPipeClient *pointer, const string &message);
+        void (*on_error)  (NamedPipeClient *pointer, const string &error_message);
 	
 	/// \brief Проверка наличия соединения
 	/// \return Вернет true, если соединение установлено
@@ -103,12 +111,12 @@ public:
 		    pipe_id = user_id;
 		    const string full_pipe_name = pipe_name_prefix + pipe_name;
  
-			if(WaitNamedPipeW(full_pipe_name, 5000) == 0) {
-				const string err_msg = pipe_name_error_title + "Pipe " + full_pipe_name + " busy.";
-				if (!is_error) on_error(GetPointer(this), err_msg);
-				is_error = true;
-				return false;
-			}
+                        if(WaitNamedPipeW(full_pipe_name, 5000) == 0) {
+                                const string err_msg = pipe_name_error_title + "Pipe " + full_pipe_name + " busy.";
+                                if (!is_error && on_error != NULL) on_error(GetPointer(this), err_msg);
+                                is_error = true;
+                                return false;
+                        }
 
 			pipe_handle = CreateFileW(
 				full_pipe_name, 
@@ -118,12 +126,12 @@ public:
 				OPEN_EXISTING, 
 				0, 
 				NULL);
-			if(pipe_handle == INVALID_HANDLE_VALUE) {
-				const string err_msg= pipe_name_error_title + "Pipe open failed, error: " + IntegerToString(kernel32::GetLastError());
-				if (!is_error) on_error(GetPointer(this), err_msg);
-				is_error = true;
-				return false;
-			}
+                        if(pipe_handle == INVALID_HANDLE_VALUE) {
+                                const string err_msg= pipe_name_error_title + "Pipe open failed, error: " + IntegerToString(kernel32::GetLastError());
+                                if (!is_error && on_error != NULL) on_error(GetPointer(this), err_msg);
+                                is_error = true;
+                                return false;
+                        }
 			
 			/* устанавливаем режим чтения
             * Клиентская сторона именованного канала начинается в байтовом режиме,
@@ -143,13 +151,13 @@ public:
          
             if(!success) {
                 const string err_msg = pipe_name_error_title + "SetNamedPipeHandleState failed, error: " + IntegerToString(kernel32::GetLastError());
-                if (!is_error) on_error(GetPointer(this), err_msg);
+                if (!is_error && on_error != NULL) on_error(GetPointer(this), err_msg);
                 is_error = true;
                 CloseHandle(pipe_handle);
                 pipe_handle = INVALID_HANDLE_VALUE;
                 return false;
             }
-            on_open(GetPointer(this));
+            if(on_open != NULL) on_open(GetPointer(this));
 		}
 		is_connected = true;
 		is_error = false;
@@ -160,10 +168,10 @@ public:
 	/// \return 0, если успешно, иначе ненулевое значение
 	int close() {
 		if (pipe_handle != INVALID_HANDLE_VALUE) {
-    		int err = CloseHandle(pipe_handle);
-    		pipe_handle = INVALID_HANDLE_VALUE;
-    		if (is_connected) on_close(GetPointer(this));
-    		is_connected = false;
+                int err = CloseHandle(pipe_handle);
+                pipe_handle = INVALID_HANDLE_VALUE;
+                if (is_connected && on_close != NULL) on_close(GetPointer(this));
+                is_connected = false;
     		return err;
 		}
 		return 0;
@@ -218,16 +226,16 @@ public:
         return ret;
 	}
 	
-	void on_timer() {
+        void on_timer() {
         if (is_connected) {
             if (get_bytes_read() > 0) {
                 const string message = read();
-                on_message(GetPointer(this), message);
+                if(on_message != NULL) on_message(GetPointer(this), message);
             }
         } else {
             open(pipe_name, pipe_id);
         }
-	}
+        }
 	
 	/// \brief Получить количество байтов для чтения
 	/// \return Количество байтов для чтения
