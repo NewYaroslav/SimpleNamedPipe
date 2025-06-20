@@ -31,8 +31,7 @@ bool  PeekNamedPipe(HANDLE fileHandle, int buffer, int bytes, int bytesRead, int
 #import
 //+------------------------------------------------------------------+
 
-/** \brief Класс клиента именованного канала
- */
+/// \brief Класс клиента именованного канала
 class NamedPipeClient {
 private:
 	HANDLE  pipe_handle;      // хэндл канала
@@ -56,10 +55,9 @@ public:
 		kernel32::GetLastError();
 	}
 	
-	/** \brief Class constructor
-	 * \param name      Named channel name
-	 * \param user_id   Unique channel number
-	 */ 
+	/// \brief Class constructor
+	/// \param name      Named channel name
+	/// \param user_id   Unique channel number
 	NamedPipeClient(const string &name, const int user_id = 0) {
 	    pipe_name_prefix  = "\\\\.\\pipe\\";
 		pipe_name_error_title = "NamedPipeClient error! What: ";
@@ -72,8 +70,7 @@ public:
 		open(name, user_id);
 	}
 	
-	/** \brief Сlass destructor
-	 */
+	/// \brief Class destructor
 	~NamedPipeClient() {
 		close();
 	}
@@ -84,25 +81,22 @@ public:
 	void on_message(NamedPipeClient *pointer, const string &message);
 	void on_error  (NamedPipeClient *pointer, const string &error_message);
 	
-	/** \brief Проверка наличия соединения
-	 * \return Вернет true - если соединение было установлено
-	 */ 
+	/// \brief Проверка наличия соединения
+	/// \return Вернет true, если соединение установлено
 	bool connected() {
 	    return is_connected;
 	}
 	
-	/** \brief Установить размер буфера
-	 * \param size Размер буфера
-	 */ 
+	/// \brief Установить размер буфера
+	/// \param size Размер буфера
 	void set_buffer_size(int size) {
 	   buffer_size = size;
 	}
 
-	/** \brief Открывает канал, открытый ранее
-	 * \param name      Имя именнованного канала
-	 * \param user_id   Уникальный номер канала
-	 * \return Вернет true - если успешно, иначе false
-	 */ 
+	/// \brief Открывает ранее созданный канал
+	/// \param name      Имя именованного канала
+	/// \param user_id   Уникальный номер канала
+	/// \return Вернет true, если успешно, иначе false
 	bool open(const string &name, const int user_id = 0) {
 		if(pipe_handle == INVALID_HANDLE_VALUE) {
 			pipe_name = name;
@@ -162,9 +156,8 @@ public:
 		return true;
 	}
 
-	/** \brief Закрывает хэндл канала
-	 * \return 0 если успешно, иначе ненулевое значение  
-	 */ 
+	/// \brief Закрывает дескриптор канала
+	/// \return 0, если успешно, иначе ненулевое значение
 	int close() {
 		if (pipe_handle != INVALID_HANDLE_VALUE) {
     		int err = CloseHandle(pipe_handle);
@@ -176,17 +169,15 @@ public:
 		return 0;
 	}
 
-	/** \brief Сбрасывает буфер канала  
-	 */
+	/// \brief Сбрасывает буфер канала
 	void flush() {
         if (pipe_handle == INVALID_HANDLE_VALUE) return;
         FlushFileBuffers(pipe_handle);
 	}
 	
-	/** \brief Write a string to a pipe
-	 * \param message String containing the message
-	 * \return Returns true if the write was successfu
-	 */
+	/// \brief Write a string to a pipe
+	/// \param message String containing the message
+	/// \return Returns true if the write was successful
 	bool write(string message) {
 		if (pipe_handle == INVALID_HANDLE_VALUE) return false;
         if (StringLen(message) == 0) return false;
@@ -209,9 +200,8 @@ public:
         return true;
 	}
    
-	/** \brief Читает строку формата ANSI из канала 
-	 * \return строка в формате Unicode (string в MQL5)
-	 */
+	/// \brief Читает строку формата ANSI из канала
+	/// \return Строка в формате Unicode (string в MQL5)
 	string read() {
         if (pipe_handle == INVALID_HANDLE_VALUE) return "";
         string ret;
@@ -239,9 +229,8 @@ public:
         }
 	}
 	
-	/** \brief Получить количество байтов для чтения
-	 * \return Количество байтов для чтения
-	 */
+	/// \brief Получить количество байтов для чтения
+	/// \return Количество байтов для чтения
 	int get_bytes_read() {
 	    if (pipe_handle == INVALID_HANDLE_VALUE) return 0;
 	    int bytes_to_read = 0;
@@ -255,23 +244,20 @@ public:
         return bytes_to_read;
 	};
 
-	/** \brief Возвращает имя канала
-	 * \return Строка с именем канала
-	 */
+	/// \brief Возвращает имя канала
+	/// \return Строка с именем канала
 	string get_pipe_name() {
 		return pipe_name;
 	};
 	
-	/** \brief Возвращает handle канала
-	 * \return HANDLE канала
-	 */
+	/// \brief Возвращает handle канала
+	/// \return HANDLE канала
     HANDLE get_pipe_handle() {
         return pipe_handle;
     };
     
-    /** \brief Возвращает user_id канала
-	 * \return user_id канала
-	 */
+	/// \brief Возвращает user_id канала
+	/// \return user_id канала
     int get_pipe_id() {
         return pipe_id;
     };
