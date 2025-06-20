@@ -1,0 +1,3 @@
+cmake -G "MinGW Makefiles" -B build -DCMAKE_BUILD_TYPE=Release -DSIMPLE_NAMED_PIPE_BUILD_STATIC=ON -DSIMPLE_NAMED_PIPE_BUILD_EXAMPLES=OFF
+cmake --build build
+pause

@@ -176,6 +176,10 @@ namespace SimpleNamedPipe {
 
 }; // namespace SimpleNamedPipe
 
+/// \note Implementation is included only in header-only mode.
+///       When building as a static library, do NOT include the .ipp here.
+#ifndef SIMPLE_NAMED_PIPE_STATIC_LIB
 #include "NamedPipeServer/NamedPipeServer.ipp"
+#endif
 
 #endif // _SIMPLE_NAMED_PIPE_SERVER_HPP_INCLUDED

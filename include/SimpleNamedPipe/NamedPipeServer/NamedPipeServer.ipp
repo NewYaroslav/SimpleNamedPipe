@@ -1,5 +1,10 @@
+#ifdef SIMPLE_NAMED_PIPE_STATIC_LIB
+#include "../NamedPipeServer.hpp"
+#endif
+
 #include <codecvt>
 #include <locale>
+#include <algorithm>
 
 namespace SimpleNamedPipe {
 
@@ -220,8 +225,8 @@ namespace SimpleNamedPipe {
             } catch (const std::system_error& ex) {
                 notify_error(ex.code());
                 notify_stop(config);
-            } catch (const std::exception& ex) {
-                notify_error(std::make_error_code(std::errc::operation_not_permitted));
+            } catch (const std::exception&) {
+                notify_error(make_error_code(NamedPipeErrc::UnhandledException));
                 notify_stop(config);
             } catch (...) {
                 notify_error(make_error_code(NamedPipeErrc::UnknownSystemError));
@@ -396,10 +401,12 @@ namespace SimpleNamedPipe {
             return;
         }
 
-
         size_t buffer_size = m_write_buffers[index].size();
         size_t msg_offset = cmd.offset;
-        size_t bytes_to_copy = std::min(buffer_size, cmd.message.size() - msg_offset);
+        size_t remaining = (msg_offset < cmd.message.size())
+            ? (cmd.message.size() - msg_offset)
+            : 0;
+        size_t bytes_to_copy = (std::min)(buffer_size, remaining);
         auto& buffer = m_write_buffers[index];
         buffer.assign(cmd.message.begin() + msg_offset, cmd.message.begin() + msg_offset + bytes_to_copy);
         cmd.offset += bytes_to_copy;

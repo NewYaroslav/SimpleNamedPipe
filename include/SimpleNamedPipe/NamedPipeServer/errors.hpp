@@ -19,7 +19,8 @@ namespace SimpleNamedPipe {
         ServerStopped,                   ///< Operation aborted because the server is stopping or stopped
         MessageTooLarge,                 ///< The message exceeds the allowed maximum size
         QueueFull,                       ///< The per-client write queue is full
-        UnknownSystemError               ///< Fallback for unexpected system errors
+        UnknownSystemError,              ///< Fallback for unexpected system errors
+        UnhandledException               ///< A generic std::exception was caught during runtime
     };
 
     /// \brief Error category for NamedPipeErrc.
