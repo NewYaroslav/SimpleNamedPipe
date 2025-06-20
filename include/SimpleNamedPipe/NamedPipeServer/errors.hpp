@@ -1,6 +1,6 @@
 #pragma once
-#ifndef _SIMLPE_NAMED_PIPE_SERVER_ERRORS_HPP_INCLUDED
-#define _SIMLPE_NAMED_PIPE_SERVER_ERRORS_HPP_INCLUDED
+#ifndef _SIMPLE_NAMED_PIPE_SERVER_ERRORS_HPP_INCLUDED
+#define _SIMPLE_NAMED_PIPE_SERVER_ERRORS_HPP_INCLUDED
 
 /// \file errors.hpp
 /// \brief Error codes and category for NamedPipeServer
@@ -74,4 +74,4 @@ namespace std {
     struct is_error_code_enum<SimpleNamedPipe::NamedPipeErrc> : true_type {};
 }
 
-#endif // _SIMLPE_NAMED_PIPE_SERVER_ERRORS_HPP_INCLUDED
+#endif // _SIMPLE_NAMED_PIPE_SERVER_ERRORS_HPP_INCLUDED
