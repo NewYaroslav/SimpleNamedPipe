@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                            named_pipe_client.mq5 |
+//|                                       NamedPipeClientExample.mq5 |
 //|                                     Copyright 2025, NewYaroslav. |
 //|                   https://github.com/NewYaroslav/SimpleNamedPipe |
 //+------------------------------------------------------------------+
