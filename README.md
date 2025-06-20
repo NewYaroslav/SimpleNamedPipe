@@ -1,5 +1,5 @@
 # SimpleNamedPipe
-![Logo](docs/logo-480x320.png)
+<img src="docs/logo-1024x680px.png" alt="Logo" width="600"/>
 
 SimpleNamedPipe is a lightweight C++ library for creating and managing asynchronous named pipe servers on Windows.
 

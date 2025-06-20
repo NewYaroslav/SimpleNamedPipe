@@ -1,5 +1,5 @@
 # SimpleNamedPipe
-![Logo](docs/logo-480x320.png)
+<img src="docs/logo-1024x680px.png" alt="Logo" width="600"/>
 
 SimpleNamedPipe — легковесная библиотека C++ для создания и управления асинхронными серверами именованных каналов в Windows.
 
