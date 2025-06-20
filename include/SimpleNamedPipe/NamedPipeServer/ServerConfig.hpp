@@ -2,7 +2,7 @@
 #ifndef _SIMPLE_NAMED_PIPE_SERVER_CONFIG_HPP_INCLUDED
 #define _SIMPLE_NAMED_PIPE_SERVER_CONFIG_HPP_INCLUDED
 
-/// \file Config.hpp
+/// \file ServerConfig.hpp
 /// \brief Конфигурация сервера именованных каналов.
 
 #include <string>
