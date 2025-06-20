@@ -10,11 +10,10 @@
 namespace SimpleNamedPipe {
 
     /// \struct WriteQueueLimits
-    /// \brief Limits for the write queue, including message count and size restrictions.
+    /// \brief Limits for the write queue, including message count and single message size restrictions.
     struct WriteQueueLimits {
         size_t max_pending_writes_per_client = 1000;           ///< Max messages queued per client
         size_t max_message_size = 64 * 1024;                   ///< Max single message size (64 KB)
-        size_t max_total_queue_memory = 100 * 1024 * 1024;     ///< Max total queued size (100 MB)
     };
 
     /// \class ServerConfig
