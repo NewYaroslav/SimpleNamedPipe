@@ -1,4 +1,6 @@
 # SimpleNamedPipe
+![Logo](docs/logo-480x320.png)
+
 SimpleNamedPipe is a lightweight C++ library for creating and managing asynchronous named pipe servers on Windows.
 
 The project is distributed under the MIT license. See the [LICENSE](LICENSE) file for the full text.
