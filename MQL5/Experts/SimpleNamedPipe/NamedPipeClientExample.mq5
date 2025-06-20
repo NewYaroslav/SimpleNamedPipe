@@ -11,21 +11,21 @@ input int    timer_period   = 10;            // Timer period for processing inco
 NamedPipeClient     *pipe           = NULL;
 
 //+------------------------------------------------------------------+
-//| NamedPipeClient function                                   |
+//| Callback functions                                               |
 //+------------------------------------------------------------------+
-void NamedPipeClient::on_open(NamedPipeClient *pointer) {
+void OnPipeOpen(NamedPipeClient *pointer) {
     Print("open connection with ", pointer.get_pipe_name());
 }
 
-void NamedPipeClient::on_close(NamedPipeClient *pointer) {
+void OnPipeClose(NamedPipeClient *pointer) {
     Print("closed connection with ", pointer.get_pipe_name());
 }
 
-void NamedPipeClient::on_message(NamedPipeClient *pointer, const string &message) {
+void OnPipeMessage(NamedPipeClient *pointer, const string &message) {
     Print("message: " + message);
 }
 
-void NamedPipeClient::on_error(NamedPipeClient *pointer, const string &error_message) {
+void OnPipeError(NamedPipeClient *pointer, const string &error_message) {
     Print("Error! What: " + error_message);
 }
 
@@ -35,6 +35,10 @@ void NamedPipeClient::on_error(NamedPipeClient *pointer, const string &error_mes
 int OnInit() {
     if (pipe == NULL) {
         if ((pipe = new NamedPipeClient(pipe_name)) == NULL) return(false);
+        pipe.on_open   = OnPipeOpen;
+        pipe.on_close  = OnPipeClose;
+        pipe.on_message= OnPipeMessage;
+        pipe.on_error  = OnPipeError;
     }
 
     EventSetMillisecondTimer(timer_period);
