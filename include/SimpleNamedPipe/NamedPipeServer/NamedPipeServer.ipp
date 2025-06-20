@@ -258,7 +258,7 @@ namespace SimpleNamedPipe {
             BOOL ok = GetQueuedCompletionStatus(completion_port, &bytes_transferred, &key, &ov, INFINITE);
             size_t index = key & CMD_INDEX_MASK;
 
-            // Специальная обработка команд отправки
+            // Special handling of send commands
             if ((key & CMD_TYPE_SEND) == CMD_TYPE_SEND) {
                 process_write_commands(index);
                 continue;
@@ -269,7 +269,7 @@ namespace SimpleNamedPipe {
                 continue;
             }
 
-            // Сигнал остановки сервера
+            // Server stop signal
             if (((key & CMD_TYPE_STOP) == CMD_TYPE_STOP) ||
                 (key == 0 && ov == nullptr && bytes_transferred == 0)) {
                 break;
@@ -278,12 +278,12 @@ namespace SimpleNamedPipe {
             DWORD err = GetLastError();
             if (!ok) {
                 if (ov == nullptr) {
-                    // Серьёзная ошибка очереди, ov пустой → невозможно продолжать
+                    // Severe queue error, ov is null so we cannot continue
                     notify_error(std::error_code(static_cast<int>(err), std::system_category()));
                     continue;
                 }
 
-                // Если ov != nullptr — это означает, что операция завершилась с ошибкой
+                // ov != nullptr means the operation completed with an error
                 if (err == ERROR_BROKEN_PIPE) {
                     notify_disconnected(index, std::error_code(err, std::system_category()));
                     DisconnectNamedPipe(m_pipes[index]);
@@ -300,17 +300,17 @@ namespace SimpleNamedPipe {
                 continue;
             }
 
-            // Подключение завершилось (ConnectNamedPipe)
+            // Connection completed (ConnectNamedPipe)
             if (ov == &m_read_overlapped[index] &&
                 bytes_transferred == 0 &&
                 !m_is_connected[index]) {
                 notify_connected(index);
             } else
-            // Обработка записи
+            // Handle write completion
             if (ov == &m_write_overlapped[index]) {
                 handle_write_completion(index, bytes_transferred);
             } else
-            // Обработка чтения
+            // Handle read completion
             if (ov == &m_read_overlapped[index] && bytes_transferred > 0) {
                 err = GetLastError();
                 m_message_buffers[index].append(m_read_buffers[index].data(), bytes_transferred);
@@ -319,7 +319,7 @@ namespace SimpleNamedPipe {
                 }
             }
 
-            // Если всё ещё не подключено — не читаем
+            // Skip reading if still not connected
             if (!m_is_connected[index].load(std::memory_order_acquire)) continue;
 
             DWORD dummy = 0;
@@ -343,7 +343,7 @@ namespace SimpleNamedPipe {
         notify_stop(config);
     }
 
-    // Обрабатываем все накопившиеся команды отправки
+    // Process all accumulated write commands
     void NamedPipeServer::process_write_commands(size_t index) {
         std::unique_lock<std::mutex> lock(m_write_mutex);
         while (!m_pending_writes[index].empty()) {
