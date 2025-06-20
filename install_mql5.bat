@@ -32,7 +32,9 @@ for /D %%T in ("%BASE%\*") do (
 
         REM Remove existing version
         if exist "!DST_LIB!" (
-            echo     [!] Removing old version...
+            echo     [!] Old version found at !DST_LIB!
+            echo     [!] Press any key to remove it...
+            pause >nul
             rmdir /s /q "!DST_LIB!"
         )
 
@@ -53,7 +55,9 @@ for /D %%T in ("%BASE%\*") do (
         echo [→] Installing example to: !DST_EXAMPLES!
 
         if exist "!DST_EXAMPLES!" (
-            echo     [!] Removing old example...
+            echo     [!] Old example found at !DST_EXAMPLES!
+            echo     [!] Press any key to remove it...
+            pause >nul
             rmdir /s /q "!DST_EXAMPLES!"
         )
 
