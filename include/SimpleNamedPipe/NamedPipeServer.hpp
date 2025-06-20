@@ -1,6 +1,6 @@
 #pragma once
-#ifndef _SIMLPE_NAMED_PIPE_SERVER_HPP_INCLUDED
-#define _SIMLPE_NAMED_PIPE_SERVER_HPP_INCLUDED
+#ifndef _SIMPLE_NAMED_PIPE_SERVER_HPP_INCLUDED
+#define _SIMPLE_NAMED_PIPE_SERVER_HPP_INCLUDED
 
 /// \file NamedPipeServer.hpp
 /// \brief Server implementation for managing named pipes
@@ -178,4 +178,4 @@ namespace SimpleNamedPipe {
 
 #include "NamedPipeServer/NamedPipeServer.ipp"
 
-#endif // _SIMLPE_NAMED_PIPE_SERVER_HPP_INCLUDED
+#endif // _SIMPLE_NAMED_PIPE_SERVER_HPP_INCLUDED
