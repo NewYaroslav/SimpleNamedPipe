@@ -12,15 +12,15 @@ namespace SimpleNamedPipe {
 
         virtual ~IConnection() = default;
 
-        /// \brief
-        /// \param client_id
-        /// \param message
-        /// \param on_done
+        /// \brief Send a message to a specific client.
+        /// \param client_id Identifier of the client.
+        /// \param message   UTF-8 message to send.
+        /// \param on_done   Optional completion callback.
         virtual void send_to(int client_id, const std::string& message, DoneCallback on_done) = 0;
 
-        /// \brief
-        /// \param client_id
-        /// \param on_done
+        /// \brief Close connection with the given client.
+        /// \param client_id Identifier of the client.
+        /// \param on_done   Optional completion callback.
         virtual void close(int client_id, DoneCallback on_done) = 0;
 
         /// \brief Checks whether a client is currently connected.

@@ -27,7 +27,7 @@
 namespace SimpleNamedPipe {
 
     /// \class NamedPipeServer
-    /// \brief
+    /// \brief Asynchronous named pipe server implementation.
     class NamedPipeServer final : public IConnection {
     public:
 
@@ -51,41 +51,41 @@ namespace SimpleNamedPipe {
 
         // API
 
-        /// \brief
-        /// \param handler
+        /// \brief Sets a custom event handler instance.
+        /// \param handler Shared pointer to the handler.
         void set_event_handler(std::shared_ptr<ServerEventHandler> handler);
 
-        /// \brief
-        /// \return
+        /// \brief Returns the currently assigned event handler.
+        /// \return Shared pointer to the handler or nullptr.
         std::shared_ptr<ServerEventHandler> get_event_handler() const;
 
-        /// \brief
-        /// \param config
+        /// \brief Applies a new server configuration.
+        /// \param config Configuration to use.
         void set_config(const ServerConfig& config);
 
         /// \brief Retrieves the current server configuration.
-        /// \return
+        /// \return Copy of the configuration object.
         const ServerConfig get_config() const;
 
         /// \brief Starts the server.
         /// \param run_async Whether to run the server in a background thread.
         void start(bool run_async = true);
 
-        /// \brief Stops the server.
+        /// \brief Stops the server and waits for the thread to finish.
         void stop();
 
         /// \brief Checks whether the server is currently running.
         bool is_running() const;
 
-        /// \brief
-        /// \param client_id
-        /// \param message
-        /// \param on_done
+        /// \brief Sends a message to a connected client.
+        /// \param client_id ID of the client.
+        /// \param message Message to send.
+        /// \param on_done Optional callback invoked when send completes.
         void send_to(int client_id, const std::string& message, DoneCallback on_done = nullptr) override;
 
-        /// \brief
-        /// \param client_id
-        /// \param on_done
+        /// \brief Closes the connection with a client.
+        /// \param client_id ID of the client.
+        /// \param on_done Optional callback invoked when the client is closed.
         void close(int client_id, DoneCallback on_done = nullptr) override;
 
         /// \brief Checks whether a client is currently connected.

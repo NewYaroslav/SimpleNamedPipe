@@ -3,33 +3,33 @@
 #define _SIMPLE_NAMED_PIPE_SERVER_CONFIG_HPP_INCLUDED
 
 /// \file ServerConfig.hpp
-/// \brief Конфигурация сервера именованных каналов.
+/// \brief Configuration for the named pipe server.
 
 #include <string>
 
 namespace SimpleNamedPipe {
 
     /// \struct WriteQueueLimits
-    /// \brief Ограничения на очередь записи, включая лимиты на количество сообщений, размер сообщений и общий объём.
+    /// \brief Limits for the write queue, including message count and size restrictions.
     struct WriteQueueLimits {
-        size_t max_pending_writes_per_client = 1000;           ///< Макс. сообщений в очереди на клиента
-        size_t max_message_size = 64 * 1024;                   ///< Макс. размер одного сообщения (64 KB)
-        size_t max_total_queue_memory = 100 * 1024 * 1024;     ///< Макс. общий объём сообщений (100 MB)
+        size_t max_pending_writes_per_client = 1000;           ///< Max messages queued per client
+        size_t max_message_size = 64 * 1024;                   ///< Max single message size (64 KB)
+        size_t max_total_queue_memory = 100 * 1024 * 1024;     ///< Max total queued size (100 MB)
     };
 
-    /// \class Config
-    /// \brief Конфигурация сервера именованных каналов.
+    /// \class ServerConfig
+    /// \brief Named pipe server configuration.
     class ServerConfig {
     public:
-        std::string      pipe_name;    ///< Имя именованного канала
-        WriteQueueLimits write_limits; ///< Лимиты очереди записи
-        size_t           buffer_size;  ///< Размер буфера для чтения и записи
-        size_t           timeout;      ///< Время ожидания в миллисекундах
+        std::string      pipe_name;    ///< Named pipe name
+        WriteQueueLimits write_limits; ///< Limits for the write queue
+        size_t           buffer_size;  ///< Size of I/O buffers
+        size_t           timeout;      ///< Timeout in milliseconds
 
-        /// \brief Конструктор с параметрами.
-        /// \param pipe_name Имя канала.
-        /// \param buffer_size Размер буфера.
-        /// \param timeout Таймаут в мс.
+        /// \brief Construct with optional parameters.
+        /// \param pipe_name Name of the pipe.
+        /// \param buffer_size Buffer size in bytes.
+        /// \param timeout Wait timeout in ms.
         ServerConfig(const std::string& pipe_name = "server",
                size_t buffer_size = 65536,
                size_t timeout = 50)

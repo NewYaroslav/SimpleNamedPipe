@@ -3,12 +3,12 @@
 #define _SIMPLE_NAMED_PIPE_SERVER_EVENT_HANDLER_HPP_INCLUDED
 
 /// \file ServerEventHandler.hpp
-/// \brief
+/// \brief Base interface for handling server events.
 
 namespace SimpleNamedPipe {
 
     /// \struct ServerEventHandler
-    /// \brief Класс для удобной работы с событиями
+    /// \brief Helper interface for reacting to server events.
     class ServerEventHandler {
     public:
         virtual ~ServerEventHandler() = default;
