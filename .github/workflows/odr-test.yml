@@ -1,0 +1,15 @@
+name: ODR Regression Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  odr-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Run ODR regression build
+        run: tests/odr/run_odr_test.sh
