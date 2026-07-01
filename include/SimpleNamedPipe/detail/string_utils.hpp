@@ -9,7 +9,8 @@
 #include <string>
 #include <system_error>
 
-namespace SimpleNamedPipe::detail {
+namespace SimpleNamedPipe {
+namespace detail {
 
     inline std::wstring utf8_to_wide(const std::string& value) {
         if (value.empty()) {
@@ -54,6 +55,7 @@ namespace SimpleNamedPipe::detail {
         return output;
     }
 
-} // namespace SimpleNamedPipe::detail
+} // namespace detail
+} // namespace SimpleNamedPipe
 
 #endif // _SIMPLE_NAMED_PIPE_DETAIL_STRING_UTILS_HPP_INCLUDED
