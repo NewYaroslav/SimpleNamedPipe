@@ -1,0 +1,36 @@
+name: Windows Named Pipe Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  client-server:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        static: [ON, OFF]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: >
+          cmake -S . -B build-${{ matrix.static }}
+          -DSIMPLE_NAMED_PIPE_BUILD_TESTS=ON
+          -DSIMPLE_NAMED_PIPE_BUILD_STATIC=${{ matrix.static }}
+          -DSIMPLE_NAMED_PIPE_BUILD_EXAMPLES=OFF
+
+      - name: Build
+        run: cmake --build build-${{ matrix.static }} --config Release --target client_server_test
+
+      - name: Run client-server test
+        shell: pwsh
+        run: |
+          $exe = "build-${{ matrix.static }}\Release\client_server_test.exe"
+          if (!(Test-Path $exe)) {
+            $exe = "build-${{ matrix.static }}\client_server_test.exe"
+          }
+          & $exe

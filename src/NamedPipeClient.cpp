@@ -3,7 +3,7 @@
 #pragma warning(disable:4267)
 #endif
 
-#include <SimpleNamedPipe/NamedPipeServer/NamedPipeServer.ipp>
+#include <SimpleNamedPipe/NamedPipeClient/NamedPipeClient.ipp>
 
 #ifdef _MSC_VER
 #pragma warning(pop)

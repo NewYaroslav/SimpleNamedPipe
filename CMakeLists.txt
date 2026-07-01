@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(SIMPLE_NAMED_PIPE_BUILD_EXAMPLES "Build example programs" ON)
 option(SIMPLE_NAMED_PIPE_BUILD_STATIC "Build static library from .ipp implementation" ON)
+option(SIMPLE_NAMED_PIPE_BUILD_TESTS "Build test programs" OFF)
 
 # Header-only library
 add_library(SimpleNamedPipe INTERFACE)
@@ -17,10 +18,17 @@ if(SIMPLE_NAMED_PIPE_BUILD_STATIC)
         src/NamedPipeServer.cpp
     )
 
+    add_library(SimpleNamedPipeClient STATIC
+        src/NamedPipeClient.cpp
+    )
+
     target_include_directories(SimpleNamedPipeServer PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_include_directories(SimpleNamedPipeClient PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
     target_compile_definitions(SimpleNamedPipeServer PUBLIC SIMPLE_NAMED_PIPE_STATIC_LIB)
-	
-	set_target_properties(SimpleNamedPipeServer PROPERTIES OUTPUT_NAME snp_server)
+    target_compile_definitions(SimpleNamedPipeClient PUBLIC SIMPLE_NAMED_PIPE_STATIC_LIB)
+
+    set_target_properties(SimpleNamedPipeServer PROPERTIES OUTPUT_NAME snp_server)
+    set_target_properties(SimpleNamedPipeClient PROPERTIES OUTPUT_NAME snp_client)
 endif()
 
 # Examples
@@ -34,6 +42,18 @@ if(SIMPLE_NAMED_PIPE_BUILD_EXAMPLES)
         target_link_libraries(${EXAMPLE_NAME} PRIVATE SimpleNamedPipe)
         if(SIMPLE_NAMED_PIPE_BUILD_STATIC)
             target_link_libraries(${EXAMPLE_NAME} PRIVATE SimpleNamedPipeServer)
+            target_link_libraries(${EXAMPLE_NAME} PRIVATE SimpleNamedPipeClient)
         endif()
     endforeach()
+endif()
+
+if(SIMPLE_NAMED_PIPE_BUILD_TESTS AND WIN32)
+    add_executable(client_server_test
+        tests/client_server_test.cpp
+    )
+    target_include_directories(client_server_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(client_server_test PRIVATE SimpleNamedPipe)
+    if(SIMPLE_NAMED_PIPE_BUILD_STATIC)
+        target_link_libraries(client_server_test PRIVATE SimpleNamedPipeServer SimpleNamedPipeClient)
+    endif()
 endif()

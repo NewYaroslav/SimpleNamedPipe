@@ -1,36 +1,44 @@
 #ifdef SIMPLE_NAMED_PIPE_STATIC_LIB
-#include "../NamedPipeServer.hpp"
+#include <SimpleNamedPipe/NamedPipeServer.hpp>
 #endif
 
-#include <codecvt>
-#include <locale>
+#include <SimpleNamedPipe/detail/string_utils.hpp>
+
 #include <algorithm>
+
+#ifndef SIMPLE_NAMED_PIPE_INLINE
+#ifdef SIMPLE_NAMED_PIPE_STATIC_LIB
+#define SIMPLE_NAMED_PIPE_INLINE
+#else
+#define SIMPLE_NAMED_PIPE_INLINE inline
+#endif
+#endif
 
 namespace SimpleNamedPipe {
 
-    inline NamedPipeServer::NamedPipeServer() {
+    SIMPLE_NAMED_PIPE_INLINE NamedPipeServer::NamedPipeServer() {
         for (size_t i = 0; i < MAX_CLIENTS; ++i) {
             m_pipes[i] = INVALID_HANDLE_VALUE;
         }
     };
 
-    inline NamedPipeServer::NamedPipeServer(const ServerConfig& config) {
+    SIMPLE_NAMED_PIPE_INLINE NamedPipeServer::NamedPipeServer(const ServerConfig& config) {
         set_config(config);
     };
 
-    inline NamedPipeServer::~NamedPipeServer() {
+    SIMPLE_NAMED_PIPE_INLINE NamedPipeServer::~NamedPipeServer() {
         stop();
     }
 
-    inline void NamedPipeServer::set_event_handler(std::shared_ptr<ServerEventHandler> handler) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::set_event_handler(std::shared_ptr<ServerEventHandler> handler) {
         m_event_handler = handler;
     }
 
-    inline std::shared_ptr<ServerEventHandler> NamedPipeServer::get_event_handler() const {
+    SIMPLE_NAMED_PIPE_INLINE std::shared_ptr<ServerEventHandler> NamedPipeServer::get_event_handler() const {
         return m_event_handler;
     }
 
-    inline void NamedPipeServer::set_config(const ServerConfig& config) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::set_config(const ServerConfig& config) {
         std::unique_lock<std::mutex> lock(m_config_mutex);
         m_config = config;
         m_is_config_updated = true;
@@ -46,12 +54,12 @@ namespace SimpleNamedPipe {
         }
     }
 
-    inline const ServerConfig NamedPipeServer::get_config() const {
+    SIMPLE_NAMED_PIPE_INLINE const ServerConfig NamedPipeServer::get_config() const {
         std::lock_guard<std::mutex> lock(m_config_mutex);
         return m_config;
     }
 
-    inline void NamedPipeServer::start(bool run_async) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::start(bool run_async) {
         std::lock_guard<std::mutex> lock(m_mutex);
         if (m_server_thread.joinable()) {
             m_is_stop_server = true;
@@ -70,7 +78,7 @@ namespace SimpleNamedPipe {
         }
     }
 
-    inline void NamedPipeServer::stop() {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::stop() {
         std::lock_guard<std::mutex> lock(m_mutex);
         if (m_is_stop_server) return;
         m_is_stop_server = true;
@@ -85,11 +93,11 @@ namespace SimpleNamedPipe {
         }
     }
 
-    inline bool NamedPipeServer::is_running() const {
+    SIMPLE_NAMED_PIPE_INLINE bool NamedPipeServer::is_running() const {
         return m_is_running.load(std::memory_order_acquire);
     }
 
-    inline void NamedPipeServer::send_to(int client_id, const std::string& message, DoneCallback on_done) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::send_to(int client_id, const std::string& message, DoneCallback on_done) {
         HANDLE completion_port = m_completion_port.load(std::memory_order_acquire);
 
         if (!m_is_running.load(std::memory_order_acquire) || !completion_port) {
@@ -111,7 +119,7 @@ namespace SimpleNamedPipe {
         PostQueuedCompletionStatus(completion_port, 0, CMD_TYPE_SEND | (index & CMD_INDEX_MASK), nullptr);
     }
 
-    inline void NamedPipeServer::close(int client_id, DoneCallback on_done) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::close(int client_id, DoneCallback on_done) {
         HANDLE completion_port = m_completion_port.load(std::memory_order_acquire);
 
         if (!m_is_running.load(std::memory_order_acquire) || !completion_port) {
@@ -128,19 +136,19 @@ namespace SimpleNamedPipe {
         PostQueuedCompletionStatus(completion_port, 0, CMD_TYPE_CLOSE | (index & CMD_INDEX_MASK), nullptr);
     }
 
-    inline bool NamedPipeServer::is_connected(int client_id) const {
+    SIMPLE_NAMED_PIPE_INLINE bool NamedPipeServer::is_connected(int client_id) const {
         size_t index = check_client_id(client_id);
         return m_is_connected[index].load(std::memory_order_acquire);
     }
 
-    inline size_t NamedPipeServer::check_client_id(int client_id) const {
+    SIMPLE_NAMED_PIPE_INLINE size_t NamedPipeServer::check_client_id(int client_id) const {
         if (client_id < 0 || static_cast<size_t>(client_id) >= MAX_CLIENTS) {
             throw std::out_of_range("client_id is out of range");
         }
         return static_cast<size_t>(client_id);
     }
 
-    inline bool NamedPipeServer::check_write_limits(int client_id, const std::string& message, std::error_code& ec) {
+    SIMPLE_NAMED_PIPE_INLINE bool NamedPipeServer::check_write_limits(int client_id, const std::string& message, std::error_code& ec) {
         if (message.size() > m_write_limits.max_message_size) {
             ec = make_error_code(NamedPipeErrc::MessageTooLarge);
             return false;
@@ -157,7 +165,7 @@ namespace SimpleNamedPipe {
         return true;
     }
 
-    inline void NamedPipeServer::init(const ServerConfig& config) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::init(const ServerConfig& config) {
         m_write_limits = config.write_limits;
 
         HANDLE completion_port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 0);
@@ -177,9 +185,8 @@ namespace SimpleNamedPipe {
         }
     }
 
-    inline void NamedPipeServer::create_pipe(size_t index, HANDLE completion_port, const ServerConfig& config) {
-        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
-        std::wstring pipe_name_w = L"\\\\.\\pipe\\" + conv.from_bytes(config.pipe_name);
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::create_pipe(size_t index, HANDLE completion_port, const ServerConfig& config) {
+        std::wstring pipe_name_w = L"\\\\.\\pipe\\" + detail::utf8_to_wide(config.pipe_name);
 
         m_pipes[index] = CreateNamedPipeW(
             pipe_name_w.c_str(),
@@ -206,7 +213,7 @@ namespace SimpleNamedPipe {
         }
     }
 
-    inline void NamedPipeServer::main_loop() {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::main_loop() {
         while (!m_is_stop_server) {
             std::unique_lock<std::mutex> lock(m_config_mutex);
             m_config_cv.wait(lock, [this] {
@@ -252,7 +259,7 @@ namespace SimpleNamedPipe {
         }
     }
 
-    inline void NamedPipeServer::run_server_loop(const ServerConfig& config) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::run_server_loop(const ServerConfig& config) {
         notify_start(config);
         HANDLE completion_port = m_completion_port.load(std::memory_order_acquire);
         while (!m_is_stop_server) {
@@ -289,7 +296,12 @@ namespace SimpleNamedPipe {
                 }
 
                 // ov != nullptr means the operation completed with an error
-                if (err == ERROR_BROKEN_PIPE) {
+                if (err == ERROR_OPERATION_ABORTED) {
+                    continue;
+                }
+
+                if (err == ERROR_BROKEN_PIPE ||
+                    err == ERROR_NO_DATA) {
                     notify_disconnected(index, std::error_code(err, std::system_category()));
                     DisconnectNamedPipe(m_pipes[index]);
                     reconnect_client(index, completion_port, &m_read_overlapped[index]);
@@ -335,8 +347,12 @@ namespace SimpleNamedPipe {
             if (!result && err != ERROR_IO_PENDING) {
                 if (err == ERROR_BROKEN_PIPE ||
                     err == ERROR_NO_DATA) {
+                    notify_disconnected(index, std::error_code(static_cast<int>(err), std::system_category()));
                     DisconnectNamedPipe(m_pipes[index]);
                     reconnect_client(index, completion_port, new_ov);
+                    continue;
+                } else
+                if (err == ERROR_OPERATION_ABORTED) {
                     continue;
                 } else {
                     notify_error(std::error_code(static_cast<int>(err), std::system_category()));
@@ -349,7 +365,7 @@ namespace SimpleNamedPipe {
     }
 
     // Process all accumulated write commands
-    inline void NamedPipeServer::process_write_commands(size_t index) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::process_write_commands(size_t index) {
         std::unique_lock<std::mutex> lock(m_write_mutex);
         while (!m_pending_writes[index].empty()) {
             m_active_writes[index].push(std::move(m_pending_writes[index].front()));
@@ -363,7 +379,7 @@ namespace SimpleNamedPipe {
         }
     }
 
-    inline void NamedPipeServer::handle_write_completion(size_t index, size_t bytes_transferred) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::handle_write_completion(size_t index, size_t bytes_transferred) {
         if (!m_active_writes[index].empty()) {
             auto& cmd = m_active_writes[index].front();
             cmd.offset += bytes_transferred;
@@ -375,7 +391,7 @@ namespace SimpleNamedPipe {
         post_next_write(index);
     }
 
-    inline void NamedPipeServer::post_next_write(size_t index) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::post_next_write(size_t index) {
         if (m_active_writes[index].empty()) {
             m_is_writing[index] = false;
             return;
@@ -424,28 +440,39 @@ namespace SimpleNamedPipe {
         }
     }
 
-    inline bool NamedPipeServer::reconnect_client(size_t index, HANDLE completion_port, OVERLAPPED* ov) {
-        memset(ov, 0, sizeof(OVERLAPPED));
+    SIMPLE_NAMED_PIPE_INLINE bool NamedPipeServer::reconnect_client(size_t index, HANDLE completion_port, OVERLAPPED* ov) {
+        for (int attempt = 0; attempt < 2; ++attempt) {
+            memset(ov, 0, sizeof(OVERLAPPED));
 
-        BOOL connected = ConnectNamedPipe(m_pipes[index], ov);
-        if (connected) {
-            PostQueuedCompletionStatus(completion_port, 0, static_cast<ULONG_PTR>(index), ov);
-            return true;
-        }
+            BOOL connected = ConnectNamedPipe(m_pipes[index], ov);
+            if (connected) {
+                PostQueuedCompletionStatus(completion_port, 0, static_cast<ULONG_PTR>(index), ov);
+                return true;
+            }
 
-        DWORD err = GetLastError();
-        if (err == ERROR_PIPE_CONNECTED) {
-            PostQueuedCompletionStatus(completion_port, 0, static_cast<ULONG_PTR>(index), ov);
-            return true;
-        } else
-        if (err != ERROR_IO_PENDING) {
+            DWORD err = GetLastError();
+            if (err == ERROR_PIPE_CONNECTED) {
+                PostQueuedCompletionStatus(completion_port, 0, static_cast<ULONG_PTR>(index), ov);
+                return true;
+            }
+            if (err == ERROR_IO_PENDING) {
+                return true;
+            }
+            if (err == ERROR_BROKEN_PIPE ||
+                err == ERROR_NO_DATA ||
+                err == ERROR_OPERATION_ABORTED) {
+                DisconnectNamedPipe(m_pipes[index]);
+                continue;
+            }
+
             notify_error(std::error_code(static_cast<int>(err), std::system_category()));
             return false;
         }
-        return true;
+
+        return false;
     }
 
-    inline void NamedPipeServer::handle_close(size_t index, HANDLE completion_port) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::handle_close(size_t index, HANDLE completion_port) {
         std::unique_lock<std::mutex> lock(m_write_mutex);
         if (m_pending_closes[index].empty()) return;
         auto on_done = std::move(m_pending_closes[index].front());
@@ -467,7 +494,7 @@ namespace SimpleNamedPipe {
         if (on_done) on_done(make_error_code(NamedPipeErrc::InvalidPipeHandle));
     }
 
-    inline void NamedPipeServer::cleanup_pending_operations(const std::error_code& reason) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::cleanup_pending_operations(const std::error_code& reason) {
         std::array<std::queue<WriteCommand>, MAX_CLIENTS> pending_writes;
         std::array<std::queue<DoneCallback>, MAX_CLIENTS> pending_closes;
 
@@ -504,7 +531,7 @@ namespace SimpleNamedPipe {
         }
     }
 
-    inline void NamedPipeServer::notify_connected(size_t index) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::notify_connected(size_t index) {
         if (m_is_connected[index].load(std::memory_order_acquire)) return;
         m_is_connected[index].store(true, std::memory_order_release);
         m_connections[index] = std::make_shared<Connection>(index, this);
@@ -513,7 +540,7 @@ namespace SimpleNamedPipe {
         if (on_event) on_event(ServerEvent::client_connected(static_cast<int>(index), m_connections[index]));
     }
 
-    inline void NamedPipeServer::notify_disconnected(size_t index, const std::error_code& ec) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::notify_disconnected(size_t index, const std::error_code& ec) {
         if (!m_is_connected[index].load(std::memory_order_acquire)) return;
         m_is_connected[index].store(false, std::memory_order_release);
         if (m_connections[index]) m_connections[index]->invalidate();
@@ -522,14 +549,14 @@ namespace SimpleNamedPipe {
         if (on_event) on_event(ServerEvent::client_disconnected(static_cast<int>(index), m_connections[index], ec));
     }
 
-    inline void NamedPipeServer::notify_message(size_t index) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::notify_message(size_t index) {
         if (m_event_handler) m_event_handler->on_message(static_cast<int>(index), m_message_buffers[index]);
         if (on_message) on_message(static_cast<int>(index), m_message_buffers[index]);
         if (on_event) on_event(ServerEvent::message_received(static_cast<int>(index), m_connections[index], std::move(m_message_buffers[index])));
         m_message_buffers[index].clear();
     }
 
-    inline void NamedPipeServer::notify_start(const ServerConfig& config) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::notify_start(const ServerConfig& config) {
         if (m_is_running.load(std::memory_order_acquire)) return;
         m_is_running.store(true, std::memory_order_release);
         if (m_event_handler) m_event_handler->on_start(config);
@@ -537,7 +564,7 @@ namespace SimpleNamedPipe {
         if (on_event) on_event(ServerEvent::server_started());
     }
 
-    inline void NamedPipeServer::notify_stop(const ServerConfig& config) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::notify_stop(const ServerConfig& config) {
         if (!m_is_running.load(std::memory_order_acquire)) return;
         m_is_running.store(false, std::memory_order_release);
         if (m_event_handler) m_event_handler->on_stop(config);
@@ -545,7 +572,7 @@ namespace SimpleNamedPipe {
         if (on_event) on_event(ServerEvent::server_stopped());
     }
 
-    inline void NamedPipeServer::notify_error(const std::error_code& ec) {
+    SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::notify_error(const std::error_code& ec) {
         if (m_event_handler) m_event_handler->on_error(ec);
         if (on_error) on_error(ec);
         if (on_event) on_event(ServerEvent::error_occurred(ec));

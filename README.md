@@ -14,6 +14,7 @@ For the documentation in Russian, see [README-RU.md](README-RU.md).
 - supports up to 256 simultaneous clients;
 - send queue with limits on message size and count;
 - event notifications via callbacks or the `ServerEventHandler` class;
+- synchronous C++ client for tests and lightweight local integrations;
 - lightweight MQL5 client with optional global callbacks;
 - the MQL5 client performs read/write synchronously; call `update()` for polling (e.g., in a timer).
 
@@ -35,6 +36,27 @@ int main() {
     server.start(); // launches the server in a separate thread
     std::cin.get(); // waits for Enter
     server.stop();
+}
+```
+
+### Minimal C++ client
+
+```cpp
+#include "SimpleNamedPipe/NamedPipeClient.hpp"
+using namespace SimpleNamedPipe;
+
+int main() {
+    NamedPipeClient client({"ExamplePipe"});
+    std::error_code error;
+
+    if (!client.connect(&error))
+        return 1;
+
+    client.write("ping", &error);
+
+    std::string response;
+    client.read(response, 5000, &error);
+    client.close();
 }
 ```
 
