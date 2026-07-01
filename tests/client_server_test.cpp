@@ -388,15 +388,15 @@ void churn_clients(TestRunner& tr) {
     tr.expect(harness.error_count() == 0, with_error("server reported error during churn: ", harness.error()));
 }
 
-void peak_255_clients_and_slot_reuse(TestRunner& tr) {
+void peak_256_clients_and_slot_reuse(TestRunner& tr) {
     ServerHarness harness("peak", 512, 25);
     harness.start();
     if (!tr.expect(harness.wait_started(), "server did not start")) return;
 
     std::vector<std::unique_ptr<SimpleNamedPipe::NamedPipeClient> > clients;
-    clients.reserve(255);
+    clients.reserve(256);
 
-    for (int i = 0; i < 255; ++i) {
+    for (int i = 0; i < 256; ++i) {
         clients.push_back(make_client(harness.pipe_name, 128, 3000));
         std::error_code ec;
         if (!tr.expect(clients.back()->connect(&ec), with_error("peak connect failed: ", ec))) {
@@ -404,11 +404,11 @@ void peak_255_clients_and_slot_reuse(TestRunner& tr) {
         }
     }
 
-    tr.expect(harness.wait_connected_at_least(255, kHeavyWait), "server did not accept 255 clients");
+    tr.expect(harness.wait_connected_at_least(256, kHeavyWait), "server did not accept 256 clients");
 
     auto extra = make_client(harness.pipe_name, 128, 150);
     std::error_code ec;
-    tr.expect(!extra->connect(&ec), "256th client should not connect while all instances are busy");
+    tr.expect(!extra->connect(&ec), "257th client should not connect while all slots are busy");
 
     const int before_disconnected = harness.disconnected_count();
     clients.back()->close();
@@ -418,7 +418,7 @@ void peak_255_clients_and_slot_reuse(TestRunner& tr) {
 
     extra = make_client(harness.pipe_name, 128, 3000);
     tr.expect(extra->connect(&ec), with_error("extra client should connect after a slot is released: ", ec));
-    tr.expect(harness.wait_connected_at_least(256, kHeavyWait), "server did not observe slot reuse connection");
+    tr.expect(harness.wait_connected_at_least(257, kHeavyWait), "server did not observe slot reuse connection");
 
     extra->close();
     for (size_t i = 0; i < clients.size(); ++i) {
@@ -449,7 +449,7 @@ int main() {
     runner.run("repeated_connect_and_open_contract", repeated_connect_and_open_contract);
     runner.run("server_disconnect_notifies_client", server_disconnect_notifies_client);
     runner.run("churn_clients", churn_clients);
-    runner.run("peak_255_clients_and_slot_reuse", peak_255_clients_and_slot_reuse);
+    runner.run("peak_256_clients_and_slot_reuse", peak_256_clients_and_slot_reuse);
     runner.run("invalid_utf8_pipe_name_fails", invalid_utf8_pipe_name_fails);
 
     if (runner.failures != 0) {

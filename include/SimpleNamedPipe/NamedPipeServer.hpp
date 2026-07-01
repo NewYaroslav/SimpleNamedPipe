@@ -102,7 +102,7 @@ namespace SimpleNamedPipe {
         };
 
         static constexpr ULONG_PTR CMD_INDEX_MASK = 0x000000FF;
-        static constexpr size_t MAX_CLIENTS = PIPE_UNLIMITED_INSTANCES;
+        static constexpr size_t MAX_CLIENTS = 256;
 
         struct WriteCommand {
             size_t client_index;

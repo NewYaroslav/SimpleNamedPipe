@@ -11,7 +11,7 @@ For the documentation in Russian, see [README-RU.md](README-RU.md).
 
 - asynchronous client handling through IO Completion Port;
 - runs either in a separate thread or blocking the current one (the `start()` parameter);
-- supports up to 255 simultaneous clients;
+- supports up to 256 simultaneous clients;
 - send queue with limits on message size and count;
 - event notifications via callbacks or the `ServerEventHandler` class;
 - synchronous C++ client for tests and lightweight local integrations;

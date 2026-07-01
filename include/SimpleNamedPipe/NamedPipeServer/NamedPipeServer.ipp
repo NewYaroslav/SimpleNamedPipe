@@ -1,8 +1,8 @@
 #ifdef SIMPLE_NAMED_PIPE_STATIC_LIB
-#include "../NamedPipeServer.hpp"
+#include <SimpleNamedPipe/NamedPipeServer.hpp>
 #endif
 
-#include "../detail/string_utils.hpp"
+#include <SimpleNamedPipe/detail/string_utils.hpp>
 
 #include <algorithm>
 
