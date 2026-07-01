@@ -69,8 +69,31 @@ using LPOVERLAPPED = OVERLAPPED*;
 #define WAIT_TIMEOUT 258
 #define WAIT_OBJECT_0 0
 #define WAIT_FAILED 0xFFFFFFFF
+#define CP_UTF8 65001
+#define MB_ERR_INVALID_CHARS 0x00000008
 
 inline DWORD GetLastError() { return 0; }
+inline int MultiByteToWideChar(
+        unsigned int,
+        DWORD,
+        const char* input,
+        int input_size,
+        wchar_t* output,
+        int output_size) {
+    if (!input || input_size < 0 || output_size < 0) {
+        return 0;
+    }
+
+    if (!output) {
+        return input_size;
+    }
+
+    const int count = input_size < output_size ? input_size : output_size;
+    for (int i = 0; i < count; ++i) {
+        output[i] = static_cast<unsigned char>(input[i]);
+    }
+    return count;
+}
 inline HANDLE CreateIoCompletionPort(HANDLE, HANDLE, ULONG_PTR, DWORD) { return reinterpret_cast<HANDLE>(1); }
 inline BOOL PostQueuedCompletionStatus(HANDLE, DWORD, ULONG_PTR, LPOVERLAPPED) { return 1; }
 inline HANDLE CreateNamedPipeW(const wchar_t*, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, const SECURITY_ATTRIBUTES*) { return reinterpret_cast<HANDLE>(1); }

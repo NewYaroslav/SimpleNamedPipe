@@ -296,7 +296,12 @@ namespace SimpleNamedPipe {
                 }
 
                 // ov != nullptr means the operation completed with an error
-                if (err == ERROR_BROKEN_PIPE) {
+                if (err == ERROR_OPERATION_ABORTED) {
+                    continue;
+                }
+
+                if (err == ERROR_BROKEN_PIPE ||
+                    err == ERROR_NO_DATA) {
                     notify_disconnected(index, std::error_code(err, std::system_category()));
                     DisconnectNamedPipe(m_pipes[index]);
                     reconnect_client(index, completion_port, &m_read_overlapped[index]);
@@ -342,8 +347,12 @@ namespace SimpleNamedPipe {
             if (!result && err != ERROR_IO_PENDING) {
                 if (err == ERROR_BROKEN_PIPE ||
                     err == ERROR_NO_DATA) {
+                    notify_disconnected(index, std::error_code(static_cast<int>(err), std::system_category()));
                     DisconnectNamedPipe(m_pipes[index]);
                     reconnect_client(index, completion_port, new_ov);
+                    continue;
+                } else
+                if (err == ERROR_OPERATION_ABORTED) {
                     continue;
                 } else {
                     notify_error(std::error_code(static_cast<int>(err), std::system_category()));

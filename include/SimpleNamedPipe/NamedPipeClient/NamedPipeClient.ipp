@@ -40,12 +40,16 @@ namespace SimpleNamedPipe {
     SIMPLE_NAMED_PIPE_INLINE bool NamedPipeClient::connect(std::error_code* error) {
         std::error_code ec;
         bool result = false;
+        bool already_connected = false;
         {
             std::lock_guard<std::mutex> lock(m_mutex);
+            already_connected =
+                m_is_connected.load(std::memory_order_acquire) &&
+                m_pipe != INVALID_HANDLE_VALUE;
             result = connect_no_lock(&ec);
         }
         set_error(error, ec);
-        if (result) {
+        if (result && !already_connected) {
             if (on_connected) on_connected();
         } else if (ec && on_error) {
             on_error(ec);
@@ -56,13 +60,21 @@ namespace SimpleNamedPipe {
     SIMPLE_NAMED_PIPE_INLINE bool NamedPipeClient::open(const std::string& pipe_name, std::error_code* error) {
         std::error_code ec;
         bool result = false;
+        bool already_connected = false;
         {
             std::lock_guard<std::mutex> lock(m_mutex);
-            m_config.pipe_name = pipe_name;
-            result = connect_no_lock(&ec);
+            already_connected =
+                m_is_connected.load(std::memory_order_acquire) &&
+                m_pipe != INVALID_HANDLE_VALUE;
+            if (already_connected) {
+                ec = std::make_error_code(std::errc::already_connected);
+            } else {
+                m_config.pipe_name = pipe_name;
+                result = connect_no_lock(&ec);
+            }
         }
         set_error(error, ec);
-        if (result) {
+        if (result && !already_connected) {
             if (on_connected) on_connected();
         } else if (ec && on_error) {
             on_error(ec);
@@ -74,8 +86,7 @@ namespace SimpleNamedPipe {
         bool notify = false;
         {
             std::lock_guard<std::mutex> lock(m_mutex);
-            notify = m_is_connected.load(std::memory_order_acquire);
-            close_no_lock(false);
+            notify = close_no_lock();
         }
         if (notify && on_disconnected) {
             on_disconnected();
@@ -93,6 +104,7 @@ namespace SimpleNamedPipe {
     SIMPLE_NAMED_PIPE_INLINE bool NamedPipeClient::write(const std::string& message, std::error_code* error) {
         std::error_code ec;
         bool result = false;
+        bool disconnected = false;
         {
             std::lock_guard<std::mutex> lock(m_mutex);
             if (!m_is_connected.load(std::memory_order_acquire) ||
@@ -110,15 +122,21 @@ namespace SimpleNamedPipe {
                     static_cast<DWORD>(message.size()),
                     &bytes_written,
                     nullptr);
-                if (!ok || bytes_written != message.size()) {
+                if (!ok) {
                     ec = std::error_code(static_cast<int>(GetLastError()), std::system_category());
-                    close_no_lock(false);
+                    disconnected = close_no_lock();
+                } else if (bytes_written != message.size()) {
+                    ec = std::make_error_code(std::errc::io_error);
+                    disconnected = close_no_lock();
                 } else {
                     result = true;
                 }
             }
         }
         set_error(error, ec);
+        if (disconnected && on_disconnected) {
+            on_disconnected();
+        }
         if (!result && ec && on_error) {
             on_error(ec);
         }
@@ -128,11 +146,15 @@ namespace SimpleNamedPipe {
     SIMPLE_NAMED_PIPE_INLINE bool NamedPipeClient::read(std::string& message, std::error_code* error) {
         std::error_code ec;
         bool result = false;
+        bool disconnected = false;
         {
             std::lock_guard<std::mutex> lock(m_mutex);
-            result = read_no_lock(message, &ec);
+            result = read_no_lock(message, &ec, &disconnected);
         }
         set_error(error, ec);
+        if (disconnected && on_disconnected) {
+            on_disconnected();
+        }
         if (result) {
             if (on_message) on_message(message);
         } else if (ec && on_error) {
@@ -145,6 +167,7 @@ namespace SimpleNamedPipe {
         std::error_code ec;
         bool result = false;
         bool no_message = false;
+        bool disconnected = false;
         {
             std::lock_guard<std::mutex> lock(m_mutex);
             if (!m_is_connected.load(std::memory_order_acquire) ||
@@ -161,15 +184,18 @@ namespace SimpleNamedPipe {
                     nullptr);
                 if (!ok) {
                     ec = std::error_code(static_cast<int>(GetLastError()), std::system_category());
-                    close_no_lock(false);
+                    disconnected = close_no_lock();
                 } else if (bytes_available == 0) {
                     no_message = true;
                 } else {
-                    result = read_no_lock(message, &ec);
+                    result = read_no_lock(message, &ec, &disconnected);
                 }
             }
         }
         set_error(error, ec);
+        if (disconnected && on_disconnected) {
+            on_disconnected();
+        }
         if (result) {
             if (on_message) on_message(message);
         } else if (!no_message && ec && on_error) {
@@ -208,9 +234,10 @@ namespace SimpleNamedPipe {
         }
     }
 
-    SIMPLE_NAMED_PIPE_INLINE size_t NamedPipeClient::available(std::error_code* error) const {
+    SIMPLE_NAMED_PIPE_INLINE size_t NamedPipeClient::available(std::error_code* error) {
         std::error_code ec;
         DWORD bytes_available = 0;
+        bool disconnected = false;
         {
             std::lock_guard<std::mutex> lock(m_mutex);
             if (!m_is_connected.load(std::memory_order_acquire) ||
@@ -226,10 +253,14 @@ namespace SimpleNamedPipe {
                     nullptr);
                 if (!ok) {
                     ec = std::error_code(static_cast<int>(GetLastError()), std::system_category());
+                    disconnected = close_no_lock();
                 }
             }
         }
         set_error(error, ec);
+        if (disconnected && on_disconnected) {
+            on_disconnected();
+        }
         if (ec && on_error) {
             on_error(ec);
         }
@@ -239,6 +270,7 @@ namespace SimpleNamedPipe {
     SIMPLE_NAMED_PIPE_INLINE bool NamedPipeClient::flush(std::error_code* error) {
         std::error_code ec;
         bool result = false;
+        bool disconnected = false;
         {
             std::lock_guard<std::mutex> lock(m_mutex);
             if (!m_is_connected.load(std::memory_order_acquire) ||
@@ -246,12 +278,15 @@ namespace SimpleNamedPipe {
                 ec = make_error_code(NamedPipeErrc::NotConnected);
             } else if (!FlushFileBuffers(m_pipe)) {
                 ec = std::error_code(static_cast<int>(GetLastError()), std::system_category());
-                close_no_lock(false);
+                disconnected = close_no_lock();
             } else {
                 result = true;
             }
         }
         set_error(error, ec);
+        if (disconnected && on_disconnected) {
+            on_disconnected();
+        }
         if (!result && ec && on_error) {
             on_error(ec);
         }
@@ -279,19 +314,28 @@ namespace SimpleNamedPipe {
     }
 
     SIMPLE_NAMED_PIPE_INLINE bool NamedPipeClient::connect_no_lock(std::error_code* error) {
-        close_no_lock(false);
         clear_error(error);
 
-        if (m_config.pipe_name.empty()) {
-            set_error(error, std::make_error_code(std::errc::invalid_argument));
+        if (m_is_connected.load(std::memory_order_acquire) &&
+            m_pipe != INVALID_HANDLE_VALUE) {
+            return true;
+        }
+
+        if (!validate_config_no_lock(error)) {
             return false;
         }
-        if (m_config.buffer_size == 0) {
+
+        std::wstring pipe_path;
+        try {
+            pipe_path = make_pipe_path(m_config.pipe_name);
+        } catch (const std::system_error& ex) {
+            set_error(error, ex.code());
+            return false;
+        } catch (const std::exception&) {
             set_error(error, std::make_error_code(std::errc::invalid_argument));
             return false;
         }
 
-        const std::wstring pipe_path = make_pipe_path(m_config.pipe_name);
         const auto start = std::chrono::steady_clock::now();
         const auto timeout = std::chrono::milliseconds(m_config.timeout);
 
@@ -353,13 +397,23 @@ namespace SimpleNamedPipe {
         }
     }
 
-    SIMPLE_NAMED_PIPE_INLINE bool NamedPipeClient::read_no_lock(std::string& message, std::error_code* error) {
+    SIMPLE_NAMED_PIPE_INLINE bool NamedPipeClient::read_no_lock(
+            std::string& message,
+            std::error_code* error,
+            bool* disconnected) {
         clear_error(error);
         message.clear();
+        if (disconnected) {
+            *disconnected = false;
+        }
 
         if (!m_is_connected.load(std::memory_order_acquire) ||
             m_pipe == INVALID_HANDLE_VALUE) {
             set_error(error, make_error_code(NamedPipeErrc::NotConnected));
+            return false;
+        }
+
+        if (!validate_config_no_lock(error)) {
             return false;
         }
 
@@ -395,22 +449,38 @@ namespace SimpleNamedPipe {
 
             if (read_error == ERROR_BROKEN_PIPE ||
                 read_error == ERROR_NO_DATA) {
-                close_no_lock(false);
+                if (disconnected) {
+                    *disconnected = close_no_lock();
+                } else {
+                    close_no_lock();
+                }
             }
             return false;
         }
     }
 
-    SIMPLE_NAMED_PIPE_INLINE void NamedPipeClient::close_no_lock(bool notify) {
+    SIMPLE_NAMED_PIPE_INLINE bool NamedPipeClient::close_no_lock() {
         const bool was_connected = m_is_connected.load(std::memory_order_acquire);
         if (m_pipe != INVALID_HANDLE_VALUE) {
             CloseHandle(m_pipe);
             m_pipe = INVALID_HANDLE_VALUE;
         }
         m_is_connected.store(false, std::memory_order_release);
-        if (notify && was_connected && on_disconnected) {
-            on_disconnected();
+        return was_connected;
+    }
+
+    SIMPLE_NAMED_PIPE_INLINE bool NamedPipeClient::validate_config_no_lock(std::error_code* error) const {
+        if (m_config.pipe_name.empty()) {
+            set_error(error, std::make_error_code(std::errc::invalid_argument));
+            return false;
         }
+        if (m_config.buffer_size == 0 ||
+            m_config.buffer_size > static_cast<size_t>((std::numeric_limits<DWORD>::max)())) {
+            set_error(error, std::make_error_code(std::errc::invalid_argument));
+            return false;
+        }
+        clear_error(error);
+        return true;
     }
 
     SIMPLE_NAMED_PIPE_INLINE void NamedPipeClient::set_error(std::error_code* out, const std::error_code& error) const {

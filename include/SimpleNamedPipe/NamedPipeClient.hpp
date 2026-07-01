@@ -92,7 +92,7 @@ namespace SimpleNamedPipe {
         /// \brief Returns number of bytes currently available in the pipe.
         /// \param error Optional output error code.
         /// \return Available byte count, or 0 when disconnected or on error.
-        size_t available(std::error_code* error = nullptr) const;
+        size_t available(std::error_code* error = nullptr);
 
         /// \brief Flushes pipe write buffers.
         /// \param error Optional output error code.
@@ -117,8 +117,9 @@ namespace SimpleNamedPipe {
         static DWORD to_dword_timeout(size_t timeout_ms);
 
         bool connect_no_lock(std::error_code* error);
-        bool read_no_lock(std::string& message, std::error_code* error);
-        void close_no_lock(bool notify);
+        bool read_no_lock(std::string& message, std::error_code* error, bool* disconnected);
+        bool close_no_lock();
+        bool validate_config_no_lock(std::error_code* error) const;
         void set_error(std::error_code* out, const std::error_code& error) const;
         void clear_error(std::error_code* out) const;
     };
