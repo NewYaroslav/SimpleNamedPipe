@@ -2,8 +2,8 @@
 #include "../NamedPipeServer.hpp"
 #endif
 
-#include <codecvt>
-#include <locale>
+#include "../detail/string_utils.hpp"
+
 #include <algorithm>
 
 #ifndef SIMPLE_NAMED_PIPE_INLINE
@@ -186,8 +186,7 @@ namespace SimpleNamedPipe {
     }
 
     SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::create_pipe(size_t index, HANDLE completion_port, const ServerConfig& config) {
-        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
-        std::wstring pipe_name_w = L"\\\\.\\pipe\\" + conv.from_bytes(config.pipe_name);
+        std::wstring pipe_name_w = L"\\\\.\\pipe\\" + detail::utf8_to_wide(config.pipe_name);
 
         m_pipes[index] = CreateNamedPipeW(
             pipe_name_w.c_str(),

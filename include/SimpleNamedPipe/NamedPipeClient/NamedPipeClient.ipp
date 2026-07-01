@@ -2,10 +2,10 @@
 #include "../NamedPipeClient.hpp"
 #endif
 
+#include "../detail/string_utils.hpp"
+
 #include <algorithm>
-#include <codecvt>
 #include <limits>
-#include <locale>
 #include <thread>
 
 #ifndef SIMPLE_NAMED_PIPE_INLINE
@@ -270,8 +270,7 @@ namespace SimpleNamedPipe {
                 ? pipe_name
                 : prefix + pipe_name;
 
-        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
-        return conv.from_bytes(full_name);
+        return detail::utf8_to_wide(full_name);
     }
 
     SIMPLE_NAMED_PIPE_INLINE DWORD NamedPipeClient::to_dword_timeout(size_t timeout_ms) {
