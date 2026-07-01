@@ -441,24 +441,35 @@ namespace SimpleNamedPipe {
     }
 
     SIMPLE_NAMED_PIPE_INLINE bool NamedPipeServer::reconnect_client(size_t index, HANDLE completion_port, OVERLAPPED* ov) {
-        memset(ov, 0, sizeof(OVERLAPPED));
+        for (int attempt = 0; attempt < 2; ++attempt) {
+            memset(ov, 0, sizeof(OVERLAPPED));
 
-        BOOL connected = ConnectNamedPipe(m_pipes[index], ov);
-        if (connected) {
-            PostQueuedCompletionStatus(completion_port, 0, static_cast<ULONG_PTR>(index), ov);
-            return true;
-        }
+            BOOL connected = ConnectNamedPipe(m_pipes[index], ov);
+            if (connected) {
+                PostQueuedCompletionStatus(completion_port, 0, static_cast<ULONG_PTR>(index), ov);
+                return true;
+            }
 
-        DWORD err = GetLastError();
-        if (err == ERROR_PIPE_CONNECTED) {
-            PostQueuedCompletionStatus(completion_port, 0, static_cast<ULONG_PTR>(index), ov);
-            return true;
-        } else
-        if (err != ERROR_IO_PENDING) {
+            DWORD err = GetLastError();
+            if (err == ERROR_PIPE_CONNECTED) {
+                PostQueuedCompletionStatus(completion_port, 0, static_cast<ULONG_PTR>(index), ov);
+                return true;
+            }
+            if (err == ERROR_IO_PENDING) {
+                return true;
+            }
+            if (err == ERROR_BROKEN_PIPE ||
+                err == ERROR_NO_DATA ||
+                err == ERROR_OPERATION_ABORTED) {
+                DisconnectNamedPipe(m_pipes[index]);
+                continue;
+            }
+
             notify_error(std::error_code(static_cast<int>(err), std::system_category()));
             return false;
         }
-        return true;
+
+        return false;
     }
 
     SIMPLE_NAMED_PIPE_INLINE void NamedPipeServer::handle_close(size_t index, HANDLE completion_port) {
