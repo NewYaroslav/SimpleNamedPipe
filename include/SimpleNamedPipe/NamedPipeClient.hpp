@@ -1,6 +1,6 @@
 #pragma once
-#ifndef _SIMPLE_NAMED_PIPE_CLIENT_HPP_INCLUDED
-#define _SIMPLE_NAMED_PIPE_CLIENT_HPP_INCLUDED
+#ifndef SIMPLE_NAMED_PIPE_HEADER_SIMPLENAMEDPIPE_NAMEDPIPECLIENT_HPP_INCLUDED
+#define SIMPLE_NAMED_PIPE_HEADER_SIMPLENAMEDPIPE_NAMEDPIPECLIENT_HPP_INCLUDED
 
 /// \file NamedPipeClient.hpp
 /// \brief Synchronous named pipe client for tests and lightweight integrations.
@@ -132,4 +132,4 @@ namespace SimpleNamedPipe {
 #include "NamedPipeClient/NamedPipeClient.ipp"
 #endif
 
-#endif // _SIMPLE_NAMED_PIPE_CLIENT_HPP_INCLUDED
+#endif // SIMPLE_NAMED_PIPE_HEADER_SIMPLENAMEDPIPE_NAMEDPIPECLIENT_HPP_INCLUDED

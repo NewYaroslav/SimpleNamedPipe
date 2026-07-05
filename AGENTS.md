@@ -40,7 +40,14 @@
 - Place opening braces on the **same line** as class, method, and namespace declarations.
 - Do not use `using namespace`; qualify names with their namespaces (e.g., `std::`).
 - Project headers come **before** system headers in include lists.
-- Each header file must start with `#pragma once` followed by an include guard of the form `_SIMPLE_NAMED_PIPE_*_HPP_INCLUDED`.
+- Each project-owned C/C++ header must start with `#pragma once` followed by a
+  non-reserved include guard derived from the project prefix and header path:
+  `SIMPLE_NAMED_PIPE_HEADER_<PATH>_<FILE>_<EXT>_INCLUDED`.
+- Do not use guard names that start with an underscore, start with an underscore
+  followed by an uppercase letter, or contain a double underscore.
+- Implementation fragments such as `.ipp`, `.inl`, or `.tpp` may remain
+  unguarded if they are only included from already guarded headers and are not
+  intended for direct inclusion.
 
 ## Constants and Macros
 
@@ -67,4 +74,3 @@
   - `build:` – build system or dependency updates
   - `ci:` – CI/CD configuration changes
   - `chore:` – tasks that do not affect production code
-
