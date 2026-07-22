@@ -301,10 +301,27 @@ namespace SimpleNamedPipe {
                 }
 
                 if (err == ERROR_BROKEN_PIPE ||
-                    err == ERROR_NO_DATA) {
+                    err == ERROR_NO_DATA ||
+                    err == ERROR_PIPE_NOT_CONNECTED) {
                     notify_disconnected(index, std::error_code(err, std::system_category()));
                     DisconnectNamedPipe(m_pipes[index]);
                     reconnect_client(index, completion_port, &m_read_overlapped[index]);
+                    continue;
+                }
+
+                if (err == ERROR_MORE_DATA &&
+                    index < MAX_CLIENTS &&
+                    ov == &m_read_overlapped[index]) {
+                    if (bytes_transferred > 0) {
+                        m_message_buffers[index].append(
+                            m_read_buffers[index].data(),
+                            bytes_transferred);
+                    }
+                    if (!m_is_connected[index].load(std::memory_order_acquire)) {
+                        continue;
+                    }
+
+                    post_next_read(index, completion_port, &m_read_overlapped[index]);
                     continue;
                 }
 
@@ -329,39 +346,73 @@ namespace SimpleNamedPipe {
             } else
             // Handle read completion
             if (ov == &m_read_overlapped[index] && bytes_transferred > 0) {
-                err = GetLastError();
                 m_message_buffers[index].append(m_read_buffers[index].data(), bytes_transferred);
-                if (err != ERROR_MORE_DATA) {
-                    notify_message(index);
-                }
+                notify_message(index);
             }
 
             // Skip reading if still not connected
             if (!m_is_connected[index].load(std::memory_order_acquire)) continue;
 
-            DWORD dummy = 0;
-            OVERLAPPED* new_ov = &m_read_overlapped[index];
-            BOOL result = ReadFile(m_pipes[index], m_read_buffers[index].data(), static_cast<DWORD>(m_read_buffers[index].size()), &dummy, new_ov);
-
-            err = GetLastError();
-            if (!result && err != ERROR_IO_PENDING) {
-                if (err == ERROR_BROKEN_PIPE ||
-                    err == ERROR_NO_DATA) {
-                    notify_disconnected(index, std::error_code(static_cast<int>(err), std::system_category()));
-                    DisconnectNamedPipe(m_pipes[index]);
-                    reconnect_client(index, completion_port, new_ov);
-                    continue;
-                } else
-                if (err == ERROR_OPERATION_ABORTED) {
-                    continue;
-                } else {
-                    notify_error(std::error_code(static_cast<int>(err), std::system_category()));
-                    continue;
-                }
-            }
+            post_next_read(index, completion_port, &m_read_overlapped[index]);
         }
 
         notify_stop(config);
+    }
+
+    SIMPLE_NAMED_PIPE_INLINE bool NamedPipeServer::post_next_read(
+            size_t index,
+            HANDLE completion_port,
+            OVERLAPPED* ov) {
+        if (index >= MAX_CLIENTS) {
+            notify_error(make_error_code(NamedPipeErrc::ClientIndexOutOfRange));
+            return false;
+        }
+        if (!m_is_connected[index].load(std::memory_order_acquire)) {
+            return true;
+        }
+
+        for (;;) {
+            memset(ov, 0, sizeof(OVERLAPPED));
+
+            DWORD bytes_read = 0;
+            BOOL result = ReadFile(
+                m_pipes[index],
+                m_read_buffers[index].data(),
+                static_cast<DWORD>(m_read_buffers[index].size()),
+                &bytes_read,
+                ov);
+
+            DWORD err = GetLastError();
+            if (result || err == ERROR_IO_PENDING) {
+                return true;
+            }
+
+            if (err == ERROR_MORE_DATA) {
+                if (bytes_read > 0) {
+                    m_message_buffers[index].append(
+                        m_read_buffers[index].data(),
+                        bytes_read);
+                }
+                continue;
+            }
+
+            if (err == ERROR_BROKEN_PIPE ||
+                err == ERROR_NO_DATA ||
+                err == ERROR_PIPE_NOT_CONNECTED) {
+                notify_disconnected(
+                    index,
+                    std::error_code(static_cast<int>(err), std::system_category()));
+                DisconnectNamedPipe(m_pipes[index]);
+                reconnect_client(index, completion_port, ov);
+                return false;
+            }
+            if (err == ERROR_OPERATION_ABORTED) {
+                return false;
+            }
+
+            notify_error(std::error_code(static_cast<int>(err), std::system_category()));
+            return false;
+        }
     }
 
     // Process all accumulated write commands
@@ -417,21 +468,21 @@ namespace SimpleNamedPipe {
             return;
         }
 
-        size_t buffer_size = m_write_buffers[index].size();
         size_t msg_offset = cmd.offset;
         size_t remaining = (msg_offset < cmd.message.size())
             ? (cmd.message.size() - msg_offset)
             : 0;
-        size_t bytes_to_copy = (std::min)(buffer_size, remaining);
-        auto& buffer = m_write_buffers[index];
-        buffer.assign(cmd.message.begin() + msg_offset, cmd.message.begin() + msg_offset + bytes_to_copy);
-        cmd.offset += bytes_to_copy;
 
         OVERLAPPED* ov = &m_write_overlapped[index];
         memset(ov, 0, sizeof(OVERLAPPED));
 
         DWORD bytes_written = 0;
-        BOOL success = WriteFile(m_pipes[index], buffer.data(), static_cast<DWORD>(bytes_to_copy), &bytes_written, ov);
+        BOOL success = WriteFile(
+            m_pipes[index],
+            cmd.message.data() + msg_offset,
+            static_cast<DWORD>(remaining),
+            &bytes_written,
+            ov);
         DWORD err = GetLastError();
         if (!success && err != ERROR_IO_PENDING) {
             if (cmd.on_done) cmd.on_done(std::error_code(static_cast<int>(err), std::system_category()));
@@ -460,6 +511,7 @@ namespace SimpleNamedPipe {
             }
             if (err == ERROR_BROKEN_PIPE ||
                 err == ERROR_NO_DATA ||
+                err == ERROR_PIPE_NOT_CONNECTED ||
                 err == ERROR_OPERATION_ABORTED) {
                 DisconnectNamedPipe(m_pipes[index]);
                 continue;
