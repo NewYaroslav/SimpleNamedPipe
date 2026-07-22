@@ -162,6 +162,7 @@ namespace SimpleNamedPipe {
         void process_write_commands();
         void process_write_commands(size_t index);
         void post_next_write(size_t index);
+        bool post_next_read(size_t index, HANDLE completion_port, OVERLAPPED* ov);
         void handle_write_completion(size_t index, size_t bytes_transferred);
         void handle_close(size_t index, HANDLE completion_port);
         void cleanup_pending_operations(const std::error_code& reason);

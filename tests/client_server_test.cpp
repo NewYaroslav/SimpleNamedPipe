@@ -266,6 +266,71 @@ void basic_io_edges(TestRunner& tr) {
     tr.expect(harness.error_count() == 0, with_error("server reported error: ", harness.error()));
 }
 
+void large_messages_cross_transport_buffers(TestRunner& tr) {
+    ServerHarness harness("large_buffers", 64, 25);
+    harness.start();
+    if (!tr.expect(harness.wait_started(), "server did not start")) return;
+
+    auto client = make_client(harness.pipe_name, 37, 3000);
+    std::error_code ec;
+    if (!tr.expect(client->connect(&ec), with_error("client connect failed: ", ec))) return;
+    tr.expect(harness.wait_connected_at_least(1), "server did not observe client connect");
+
+    std::string payload;
+    payload.reserve(8192);
+    for (int i = 0; i < 8192; ++i) {
+        payload.push_back(static_cast<char>('A' + (i % 26)));
+    }
+
+    tr.expect(client->write(payload, &ec), with_error("large message write failed: ", ec));
+    std::string response;
+    tr.expect(client->read(response, 3000, &ec), with_error("large message read failed: ", ec));
+    const std::string expected = "Echo: " + payload;
+    if (!tr.expect(response == expected, "large message echo bytes did not match")) {
+        std::cerr << "expected bytes=" << expected.size()
+                  << " actual bytes=" << response.size() << "\n";
+    }
+    tr.expect(harness.wait_messages_at_least(1), "server did not receive large message");
+
+    client->close();
+    tr.expect(harness.wait_disconnected_at_least(1), "server did not observe client close");
+    harness.stop();
+    tr.expect(harness.error_count() == 0, with_error("server reported error: ", harness.error()));
+}
+
+void adjacent_messages_are_not_merged(TestRunner& tr) {
+    ServerHarness harness("adjacent_messages", 1024, 25);
+    harness.start();
+    if (!tr.expect(harness.wait_started(), "server did not start")) return;
+
+    auto client = make_client(harness.pipe_name, 1024, 3000);
+    std::error_code ec;
+    if (!tr.expect(client->connect(&ec), with_error("client connect failed: ", ec))) return;
+    tr.expect(harness.wait_connected_at_least(1), "server did not observe client connect");
+
+    const std::string first = "first-json-rpc-request";
+    const std::string second = "second-json-rpc-request";
+    tr.expect(client->write(first, &ec), with_error("first adjacent write failed: ", ec));
+    tr.expect(client->write(second, &ec), with_error("second adjacent write failed: ", ec));
+
+    std::string first_response;
+    std::string second_response;
+    tr.expect(client->read(first_response, 3000, &ec),
+              with_error("first adjacent read failed: ", ec));
+    tr.expect(client->read(second_response, 3000, &ec),
+              with_error("second adjacent read failed: ", ec));
+    tr.expect(first_response == "Echo: " + first,
+              "first adjacent response should echo only first message");
+    tr.expect(second_response == "Echo: " + second,
+              "second adjacent response should echo only second message");
+    tr.expect(harness.wait_messages_at_least(2), "server did not receive two adjacent messages");
+
+    client->close();
+    tr.expect(harness.wait_disconnected_at_least(1), "server did not observe client close");
+    harness.stop();
+    tr.expect(harness.error_count() == 0, with_error("server reported error: ", harness.error()));
+}
+
 void repeated_connect_and_open_contract(TestRunner& tr) {
     ServerHarness harness("repeat", 1024, 25);
     harness.start();
@@ -446,6 +511,8 @@ int main() {
     TestRunner runner;
 
     runner.run("basic_io_edges", basic_io_edges);
+    runner.run("large_messages_cross_transport_buffers", large_messages_cross_transport_buffers);
+    runner.run("adjacent_messages_are_not_merged", adjacent_messages_are_not_merged);
     runner.run("repeated_connect_and_open_contract", repeated_connect_and_open_contract);
     runner.run("server_disconnect_notifies_client", server_disconnect_notifies_client);
     runner.run("churn_clients", churn_clients);
